@@ -1475,7 +1475,7 @@ private $last_set_corpus;
 
 //$intermed_file_mode = true;
 $intermed_file_mode = false;// DEBUG
-//TODO make no-intermed work properly, and then remove tjhe with-intermed-fgile version. 
+//TODO make no-intermed work properly, and then remove the with-intermed-file version. 
 
 if ($intermed_file_mode)
 {
@@ -2149,7 +2149,7 @@ else
 Beginning diagnostics on CQP child process connection.
 
 Using following configuration variables:
-    \$path_to_cqp = ``$path_to_cqp''
+    \$path_to_cqp  = ``$path_to_cqp''
     \$cwb_registry = ``$cwb_registry''
 
 
@@ -2212,8 +2212,7 @@ END_BLOCK;
 					$infoblob .= "\n    CHECK FAILED. Ensure that $cqp_exe is readable by the username this script is running under.\n";
 					break;
 				}
-				else
-					$infoblob .= " yes it is!\n\n";
+				$infoblob .= " yes it is!\n\n";
 			}
 			
 			
@@ -2224,8 +2223,7 @@ END_BLOCK;
 				$infoblob .= "\n    CHECK FAILED. Ensure that $cwb_registry exists and contains the CQP executable.\n";
 				break;
 			}
-			else
-				$infoblob .= " yes it does!\n\n";
+			$infoblob .= " yes it does!\n\n";
 			
 			/* check that this user has read/execute permissions to it */
 			$infoblob .= "Checking that CWB registry is readable by this user... ";
@@ -2234,20 +2232,17 @@ END_BLOCK;
 				$infoblob .= "\n    CHECK FAILED. Ensure that $cwb_registry is readable by the username this script is running under.\n";
 				break;
 			}
-			else if (!is_executable($cwb_registry))
+			if (!is_executable($cwb_registry))
 			{
 				$infoblob .= "\n    CHECK FAILED. Ensure that $cwb_registry is executable by the username this script is running under.\n";
 				break;
 			}
-			else
-				$infoblob .= " yes it is!\n\n";
+			$infoblob .= " yes it is!\n\n";
 			
 			
 			/* do an experimental startup */
-			$infoblob .= "Now running process-open to get a link to CQP ... \n\n";
-			$io_settings = array(
-					self::SLV_IN  => array("pipe", "r"),self::SLV_OUT => array("pipe", "w"),self::SLV_ERR => array("pipe", "w")  
-				);
+			$infoblob .= "Now running process-open to get a link to CQP ... ";
+			$io_settings = array(  	self::SLV_IN  => array("pipe", "r"),self::SLV_OUT => array("pipe", "w"),self::SLV_ERR => array("pipe", "w")  );
 			$command = "$cqp_exe -c -r '$cwb_registry'";
 			$pipe = NULL;
 			$process = proc_open($command, $io_settings, $pipe);
@@ -2259,17 +2254,16 @@ END_BLOCK;
 				$infoblob .= "\n    CHECK FAILED. Process handle is not a PHP resource.\n";
 				break;
 			}
-			else if ('process' != ($t = get_resource_type($process)))
+			if ('process' != ($t = get_resource_type($process)))
 			{
 				$infoblob .= "\n    CHECK FAILED. Process handle is a PHP resource, but of the wrong type (it is '$t', it should be 'process').\n";
 				break;
 			}
-			else
-				$infoblob .= " yes it has!\n\n";
-
-
+			$infoblob .= " yes it has!\n\n";
+			
+			
 			// TODO, maybe call proc_ get_ status() and check each field is as it should be >?
-
+			
 			
 			/* check pipe has got the three stream resources in it that it should have. */ 
 			$infoblob .= "Checking that we've got the right pipes into and out of the CQP process... ";
@@ -2293,8 +2287,7 @@ END_BLOCK;
 			}
 			if ($pipe_tests_failed)
 				break;
-			else 
-				$infoblob .= " all looking good!\n\n";
+			$infoblob .= " all looking good!\n\n";
 			
 			
 			/* test read from pipe */
@@ -2305,18 +2298,17 @@ END_BLOCK;
 				$infoblob .= "\n    CHECK FAILED. Couldn't read a line from CQP.\n";
 				break;
 			}
-			else if ('' === $test)
+			if ('' === $test)
 			{
 				$infoblob .= "\n    CHECK FAILED. Read a line, but it was empty; CQP should print its version on startup.\n";
 				break;
 			}
-			else if ('' === ($test = trim($test)))
+			if ('' === ($test = trim($test)))
 			{
 				$infoblob .= "\n    CHECK FAILED. Read a line, but it contained only spaces; CQP should print its version on startup.\n";
 				break;
 			}
-			else
-				$infoblob .= " yes it is!\n\n";
+			$infoblob .= " yes it is!\n\n";
 			
 			
 			/* check versioning */
@@ -2329,14 +2321,13 @@ END_BLOCK;
 				$infoblob .= "\n    CHECK FAILED. The reported CQP version [$version_string] could not be parsed.\n";
 				break;
 			}
-			else if (!self::diagnose_version($m))
+			if (!self::diagnose_version($m))
 			{
 				$needed = self::default_required_version();
 				$infoblob .= "\n    CHECK FAILED. Your CWB-core is too old ($version_string). Please install version $needed or higher of CWB.\n";
 				break;
 			}
-			else
-				$infoblob .= " yes, $version_string is high enough!\n\n";
+			$infoblob .= " yes, $version_string is high enough!\n\n";
 			
 			
 			/* check write to the input pipe. */
@@ -2348,35 +2339,36 @@ END_BLOCK;
 				$infoblob .= "\n    CHECK FAILED. Error writing to CQP's input pipe; only $written_bytes of $write_me_len.\n";
 				break;
 			}
-			else
+
+			$n_lines = 0;
+			$seen_marker = false;
+			while (true)
 			{
-				$n_lines = 0;
-				while (true)
-				{
-					if (false === ($line = fgets($pipe[self::SLV_OUT])))
-						break;
-					else if (empty($line = trim($line)))
-						;
-					else if (self::END_OF_OUTPUT_SEEK == $line)
-					{
-						$seen_marker = true;
-						break;
-					}
+				if (false === ($line = fgets($pipe[self::SLV_OUT])))
+					break;
+				$line = trim($line);
+				
+				if (!empty($line))
 					$n_lines++;
-				}
-				if (!$seen_marker)
+				
+				if (self::END_OF_OUTPUT_SEEK == $line)
 				{
-					$infoblob .= "\n    CHECK FAILED. Sent data successfully to CQP, but didn't get back the full output data.\n";
+					$seen_marker = true;
 					break;
 				}
-				else if (2 > $n_lines)
-				{
-					$infoblob .= "\n    CHECK FAILED. Sent data successfully to CQP, but got too little data back ($n_lines lines).\n";
-					break;
-				}
-				else
-					$infoblob .= " successfully sent $written_bytes bytes to CQP, and got back $n_lines lines of output!\n\n";
 			}
+			if (!$seen_marker)
+			{
+				$infoblob .= "\n    CHECK FAILED. Sent data successfully to CQP, but didn't get back the full output data.\n";
+				break;
+			}
+			if (1 > $n_lines)
+			{
+				$infoblob .= "\n    CHECK FAILED. Sent data successfully to CQP, but got too little data back ($n_lines lines).\n";
+				break;
+			}
+			$infoblob .= " successfully sent $written_bytes bytes to CQP, and got back $n_lines line(s) of output!\n\n";
+			
 			
 			/* we are happy that reading and writing have both worked out OK. */
 			/* we can use this rough & ready execute function now. */
@@ -2401,9 +2393,8 @@ END_BLOCK;
 			
 			/* and we can finally set success to *true* */
 			$success = true;
-
-			/* end of do-while -- our "breakout" point. */
 			
+			/* end of do-while -- our "breakout" point. */
 		} while (false);
 		
 		/* exit point for list of checks (from "break" above) */

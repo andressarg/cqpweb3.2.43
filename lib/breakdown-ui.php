@@ -186,11 +186,12 @@ list($db_tokens_total, $db_types_total) = mysqli_fetch_row(do_sql_query($sql));
 
 
 
-$sql = "select {$breakdown_of_info[$breakdown_of]['sql_label']} as n, 
-	count({$breakdown_of_info[$breakdown_of]['sql_label']}) as sum 
-	from $dbname group by {$breakdown_of_info[$breakdown_of]['sql_groupby']} 
-	order by sum desc, {$breakdown_of_info[$breakdown_of]['sql_label']} asc
-	$limit_string";
+$sql = "select {$breakdown_of_info[$breakdown_of]['sql_label']}      as n, 
+			count({$breakdown_of_info[$breakdown_of]['sql_label']})  as sum 
+			from `$dbname` 
+			group by {$breakdown_of_info[$breakdown_of]['sql_groupby']} 
+			order by sum desc, n asc
+			$limit_string";
 $result = do_sql_query($sql);
 
 
@@ -256,12 +257,21 @@ else
 	{
 		$navlinks .= '<td align="center" class="concordgrey"><b><a class="page_nav_links" ';
 		if ( 0 != $nav_page_no[$key])
+		{
+			switch($breakdown_of)
+			{
+			case 'words':   $redirector = "concBreakdownWords";   break;
+			case 'annot':   $redirector = "concBreakdownAnnot";    break;
+			case 'both':    $redirector = "concBreakdownBoth";    break;
+			}
 			/* this should be an active link */
-			$navlinks .= ' href="redirect.php?redirect=breakdown&qname=' . $qname 
+			$navlinks .= ' href="redirect.php?redirect=' . $redirector . "&concBreakdownAt=" . $int_position
+				. '&qname=' . $qname
 				. (empty($pass_per_page) ? '' : "&pp=$pass_per_page") 
 				. '&pageNo=' . $nav_page_no[$key]
 				. '"'
 				;
+		}
 		$navlinks .= ">$m</b></a></td>";
 	}
 	
@@ -334,19 +344,19 @@ else
 			for ( $i = (($page_no-1)*$per_page)+1 ; $o = mysqli_fetch_object($result) ; $i++ )
 			{
 				$percent = round(($o->sum / $db_tokens_total)*100, 2);
+				$iT = $iF = '';
 				
 				switch($breakdown_of)
 				{
 				case 'words':
 					$iF = urlencode($o->n);
-					$iT = '';
 					break;
 				case 'annot':
-					$iF = '';
 					$iT = urlencode($o->n);
 					break;
 				case 'both':
-					preg_match('/\A(.*)_([^_]+)\z/', $o->n, $m);
+					if (!preg_match('/^(.*)_([^_]+)$/', $o->n, $m))
+						exiterror("Nonjoint value detected when looking for word/tag combination!");
 					$iF = urlencode($m[1]);
 					$iT = urlencode($m[2]);
 					break;
@@ -386,8 +396,11 @@ function freqbreakdown_write_download($result, $description, $total_for_percent)
 {
 	global $User;
 	$eol = $User->eol();
-	$description = preg_replace('/&[lr]dquo;/', '"', $description);
+//	$description = preg_replace('/&[lr]dquo;/', '"', $description);
+//	$description = preg_replace('/&([lr]dquo|quot);/', '"', $description);
+	$description = strtr($description, ['&ldquo;'=>"\u{201C}", '&rdquo;'=>"\u{201D}", '&quot;'=>'"', '&apos;'=>"'"]);
 	$description = preg_replace('/<\/?em>/', '', $description);
+	$description = preg_replace('/<\/?span.*?>/', '', $description);
 	$description = str_replace('<br>', $eol, $description);
 
 	header("Content-Type: text/plain; charset=utf-8");

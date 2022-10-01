@@ -818,6 +818,8 @@ function printquery_freqtablecachecontrol()
 				foreach (array_keys($stray_tables) as $stray)
 				{
 					$info = mysqli_fetch_object(do_sql_query("show table status like '$stray'"));
+					if (!$info)
+						continue;
 					$size = $info->Data_length + $info->Index_length;
 					echo "\n\t\t<tr>"
 						, '<td class="concordgrey">', $stray, '</td>'
@@ -951,7 +953,7 @@ function printquery_restrictioncachecontrol()
 		<tr>
 			<td class="concordgrey" colspan="2">
 				<p>
-					The <b>restriction cache</b> is a single MySQL table containing the internal data of recently-used query restrictions.
+					The <b>restriction cache</b> is a single SQL table containing the internal data of recently-used query restrictions.
 				</p>
 			</td>
 		</tr>

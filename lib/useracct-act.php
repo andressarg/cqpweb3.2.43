@@ -558,13 +558,13 @@ END_OF_EMAIL;
 
 case 'requestPasswordReset':
 
-	if (!isset($_GET['userForPasswordReset']))
+	if (!isset($_GET['userForResetRequest']))
 		exiterror("No username supplied. Please go back and try again.");
 
-	if ( ! in_array($_GET['userForPasswordReset'], get_list_of_users()) )
+	if ( ! in_array($_GET['userForResetRequest'], get_list_of_users()) )
 		exiterror("Invalid username! Please go back and try again.");
 
-	if (false === ($reset_user = get_user_info($_GET['userForPasswordReset'])))
+	if (false === ($reset_user = get_user_info($_GET['userForResetRequest'])))
 		exiterror("Invalid username! Please go back and try again.");
 
 	list($realname, $user_address) = render_user_name_and_email($reset_user);

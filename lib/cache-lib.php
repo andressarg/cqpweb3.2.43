@@ -42,7 +42,7 @@ class QueryRecord
 	 * ========================================
 	 */
 	
-	/** knowledge about the database; stored as private static 'cos a const can't be an array. */
+	/** knowledge about the database; stored as private static 'cos a const can't be an array. TODO: in php 7.3 it can. */
 	private static $DATABASE_FIELD_NAMES = array(
 		'query_name',
 		'user',
@@ -961,7 +961,7 @@ class QueryRecord
 // the text-metadata table can be used.
 //
 // SO: what does that imply we should do here?
-// We need to ask the QueryScope if it consists purely of texts. If it does we can as about the intersection with the 
+// We need to ask the QueryScope if it consists purely of texts. If it does we can ask about the intersection with the 
 // If it doesn't, we need to ..... what? exiterrror? YES: for now, since it means we have a dist postprocess + a non-text Scope, which
 // ought not to be possible at present. 
 

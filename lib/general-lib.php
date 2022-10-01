@@ -225,6 +225,8 @@ function set_next_absolute_location($relative_url)
 }
 
 
+
+
 /**
  * This function creates absolute URLs from relative ones by adding the relative
  * URL argument $u to the real URL of the directory in which the script is running.
@@ -246,6 +248,7 @@ function url_absolutify($u, $special_subdir = NULL)
 {
 	global $Config;
 	global $Corpus;
+
 	
 	/* outside a corpus, extract the immediate containing directory from REQUEST_URI (e.g. 'adm') */
 	if ( (empty($special_subdir) && (empty($Corpus) || !$Corpus->specified)) && ! empty($_SERVER['REQUEST_URI']))
@@ -316,6 +319,17 @@ function list_parameter_values_from_http_query($param_name, $query_string)
 }
 
 
+// produces a list of parameters that should ALWAYS be scrubbed out of what is pass3ed. 
+function list_things_always_to_ignore_for_print_input_funcs()
+{
+
+return [
+'t', 'del','concBreakdownAt','progToChart', 'distOver',
+];
+
+}
+
+
 
 // TODO replace with better function that makes use of keys.
 // There is a building PHP fucniton -- http_build_query.
@@ -334,6 +348,12 @@ function list_parameter_values_from_http_query($param_name, $query_string)
  */
 function url_printget($changes = "Nope!", $file = '', $line = '')
 {
+	static $always = NULL;
+	if(empty($always))
+		$always = list_things_always_to_ignore_for_print_input_funcs();
+
+
+
 $d = debug_backtrace();
 $file = basename($d[0]['file']);
 $line = $d[0]['line'];
@@ -344,6 +364,7 @@ $line = $d[0]['line'];
 // if ($User->is_admin()) echo "<pre>These are the things being passed-thru by GET (to URL)  this time...</pre>";
 	foreach ($_GET as $key => $val)
 	{
+if (in_array($key, $always)) continue;
 		if (!empty($string))
 			$string .= '&';
 // if ($User->is_admin()) echo "<pre>Passing through $key ($val)</pre>";
@@ -365,10 +386,8 @@ $line = $d[0]['line'];
 
 if ($User->is_admin()) 
 {
-	if ('t' == $key || 'del' == $key)
-		; //echo "<pre>URL PRINTGET:::Passing through $key ($val).......................................     IGNORING IT.  </pre>";
-	else
-		echo "<pre>URL PRINTGET:::Passing through $key ($val).......................................     AND USING IT. ($file, $line) </pre>"; 
+//	if (!in_array($key, $always))
+//		echo "<pre>URL PRINTGET:::Passing through $key ($val).......................................     AND USING IT. ($file, $line) </pre>"; 
 }
 				$string .= $key . '=' . urlencode($newval);
 			}
@@ -408,6 +427,10 @@ if ($User->is_admin())
  */
 function url_printinputs($changes = "Nope!", $file = '', $line = '')
 {
+	static $always = NULL;
+	if(empty($always))
+		$always = list_things_always_to_ignore_for_print_input_funcs();
+
 $d = debug_backtrace();
 $file = basename($d[0]['file']);
 $line = $d[0]['line'];
@@ -418,7 +441,8 @@ $line = $d[0]['line'];
 // if ($User->is_admin()) echo "<pre>These are the things being passed-thru by GET (to HIDDENINPUT)  this time...</pre>";
 	foreach ($_GET as $key => $val)
 	{
-if ('t' == $key || 'del' == $key) continue;
+
+if (in_array($key, $always)) continue;
 		if ($change_me)
 		{
 			$newval = $val;
@@ -436,7 +460,8 @@ if ('t' == $key || 'del' == $key) continue;
 
 if ($User->is_admin()) 
 {
-	echo "<pre>URL PRINTINPUT:::Passing through $key ($val).......................................     AND USING IT. ($file, $line) </pre>"; 
+//	if (!in_array($key, $always))
+//		echo "<pre>URL PRINTGET:::Passing through $key ($val).......................................     AND USING IT. ($file, $line) </pre>"; 
 }
 			}
 		}
@@ -514,7 +539,8 @@ function prepare_page_no($n)
  * 
  * @param  string $as             (input|url)
  * @param  int    $pp             Number of hits to show per page in a concordance.
- * @return string                 A bit of URL or a hidden input.$this
+ * @return string                 A bit of URL or a hidden input. If a URL, DOES NOT
+ *                                include the & or ?.
  */
 function print_per_page_for_reinsertion($as, $pp)
 {
@@ -616,6 +642,24 @@ function change_file_encoding($infile, $outfile, $source_charset_for_iconv, $des
 	fclose($source);
 	fclose($dest);
 }
+
+
+
+/** Function to check if we have a given amount of spare RAM. Allows tidy shutdown under control of caller. */
+function lookahead_for_memory_abort($headroom)
+{
+	static $limit = NULL;
+	if (NULL === $limit)
+		$limit = ini_get('memory_limit');
+	
+	$in_use = memory_get_usage();
+	
+	return ($in_use + $headroom + 4096 < $limit);  /* note -- 4kb margin */
+}
+// designed to stop export-corpus running out of memory, by checking between loops but I'm really not sure that it will actually work.
+
+
+
 
 
 
@@ -1278,18 +1322,19 @@ function detect_php_opcaching()
 	
 	switch (true)
 	{
-	/* old name and new name  for this extension .... */
-	case extension_loaded('opcache')|| extension_loaded('Zend OPcache'):
+// 	/* old name and new name  for this extension .... */
+// 	case extension_loaded('opcache')|| extension_loaded('Zend OPcache'):
+	case ini_get('opcache.enable'):
 		return 'opcache';
-	case extension_loaded('wincache'):
+	case ini_get('wincache.ocenabled'):
 		return 'wincache';
 	/* note: in php 5.5+, apc is disabled in favour of Zend opcache. 
 	 * Only "apcu" (apc user cache with no opcode cache) is included.
-	 * The "extension loaded test below  will return TRUE even if we only have "apcu". 
+	 * The "apc.enabled" test below  will return TRUE even if we only have "apcu". 
 	 * So, we ALSO have to check for the existence of one of the actual
 	 * opcode-cache (not user-cache!) functions.
 	 */
-	case extension_loaded('apc') && function_exists('apc_compile_file'):
+	case ini_get('apc.enabled') && function_exists('apc_compile_file'):
 		return 'apc';
 	default:
 		return false;
@@ -1386,5 +1431,7 @@ function do_opcache_full_unload($limit = 'all')
 	/* default do nothing */
 	}
 }
+
+
 
 

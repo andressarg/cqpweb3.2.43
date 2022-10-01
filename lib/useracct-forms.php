@@ -170,9 +170,14 @@ function do_usr_ui_welcome()
 				Welcome back to the CQPweb server<?php echo $personalise; ?>. You are logged in to the system.
 
 				<br>&nbsp;<br>
-
-				This is your user page; select an option from the menu on the left, or
-				<a href="../">click here to return to the main homepage</a>.
+				
+				This is your user page; select an option from the menu on the left.
+				
+				
+				<br>&nbsp;<br>
+				
+				To choose a corpus and start running queries, 
+				<a href="../index.php">click here to return to the main homepage</a>.
 
 				<br>&nbsp;
 			</td>
@@ -363,35 +368,39 @@ function do_usr_ui_create()
 			}
 			?>
 			<tr>
-				<td class="concordgeneral" WIDTH="40%">
-					Enter your chosen username:
+				<td class="concordgeneral" width="40%">
+					<label for="newUsername">Enter your chosen username:</label>
 				</td>
 				<td class="concordgeneral">
-					<p style="display:inline-block"><input type="text" placeholder="Choose a username (letters/numbers/underscore only)" size="50" maxlength="30" name="newUsername" 
-					<?php
-					if ($prepop)
-						echo " value=\"{$prepop->newUsername}\" ";
-					?>
-					></p>
+					<p style="display:inline-block">
+						<input id="newUsername" type="text" placeholder="Choose a username (letters/numbers/underscore only)" size="50" maxlength="30" name="newUsername" 
+						<?php 
+						if ($prepop) 
+							echo " value=\"{$prepop->newUsername}\" ";
+						?>
+						>
+					</p>
 				</td>
 			</tr>
 			<tr>
-
-
 				<td class="concordgeneral">
-					Enter your password or passphrase:
+					<label for="newPassword">Enter your password or passphrase:</label>
 				</td>
 				<td class="concordgeneral">
-					<p style="display:inline-block"><input id="newPassword" type="password" placeholder="Enter your chosen password here" size="50" maxlength="255" name="newPassword"></p>
+					<p style="display:inline-block">
+						<input id="newPassword" type="password" placeholder="Enter your chosen password here" size="50" maxlength="255" id="newPassword" name="newPassword">
+					</p>
 					<p class="capsLockHiddenPara" style="display:none"><strong>WARNING</strong>: Caps Lock seems to be on!</p>
 				</td>
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Retype the password or passphrase:
+					<label for="newPasswordCheck">Retype the password or passphrase:</label>
 				</td>
 				<td class="concordgeneral">
-					<p style="display:inline-block"><input id="newPasswordCheck" type="password" placeholder="Please re-type your password!" size="50" maxlength="255" name="newPasswordCheck"></p>
+					<p style="display:inline-block">
+						<input id="newPasswordCheck" type="password" placeholder="Please re-type your password!" size="50" maxlength="255" name="newPasswordCheck">
+					</p>
 					<p class="capsLockHiddenPara" style="display:none"><strong>WARNING</strong>: Caps Lock seems to be on!</p>
 				</td>
 			</tr>
@@ -414,7 +423,7 @@ function do_usr_ui_create()
 					<p>
 						This is because your access to some corpora may depend on what
 						institution you are affiliated to &ndash; and we use your email address to detect your affiliation.
-						If you specify a Gmail, Hotmail or other freely-obtainable email address, we won't be able to detect
+						If you specify a Gmail, Yahoo or other freely-obtainable email address, we won't be able to detect
 						your affiliation, and you may not have access to all the corpora that you should have access to.
 					</p>
 					<p class="spacer">&nbsp;</p>
@@ -422,12 +431,12 @@ function do_usr_ui_create()
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Enter your email address:
+					<label for="newEmail">Enter your email address:</label>
 					<br>
 					<em>Note that this cannot be changed later!</em>
 				</td>
 				<td class="concordgeneral">
-					<input type="email" placeholder="your.address@somewhere.net" size="50" maxlength="255" name="newEmail"
+					<input id="newEmail" type="email" placeholder="your.address@somewhere.net" size="50" maxlength="255" name="newEmail"
 					<?php
 					if ($prepop)
 						echo " value=\"{$prepop->newEmail}\" ";
@@ -445,17 +454,17 @@ function do_usr_ui_create()
 				
 				<tr>
 					<td class="concordgeneral">
-						Type in the 6 characters from the picture to prove you are a human being:
+						<label for="captchaResponse">Type in the 6 characters from the picture to prove you are a human being:</label>
 						<br>
 						<em>N.B.: all letters are lowercase.</em>
 					</td>
 					<td class="concordgeneral">
 						<script defer src="../jsc/captcha.js"></script>
-						<img id="captchaImg" src="useracct-act.php?<?php echo $params; ?>">
+						<img id="captchaImg" alt="Image for the human being check" src="useracct-act.php?<?php echo $params; ?>">
 						<br>
 						<a onClick="refresh_captcha();" class="menuItem">[Too hard? Click for another]</a>
 						<br>
-						<input type="text" size="30" maxlength="10" name="captchaResponse">
+						<input id="captchaResponse" type="text" size="30" maxlength="10" name="captchaResponse">
 						<input id="captchaRef" type="hidden" name="captchaRef" value="<?php echo $captcha_code; ?>">
 					</td>
 				</tr>
@@ -477,10 +486,10 @@ function do_usr_ui_create()
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Please enter your real name:
+					<label for="realName">Please enter your real name:</label>
 				</td>
 				<td class="concordgeneral">
-					<input type="text" size="50" maxlength="255" name="realName" 
+					<input id="realName" type="text" size="50" maxlength="255" name="realName" 
 					<?php
 					if ($prepop)
 						echo " value=\"{$prepop->realName}\" ";
@@ -490,12 +499,12 @@ function do_usr_ui_create()
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Please enter your affiliation:
+					<label for="affiliation">Please enter your affiliation:</label>
 					<br>
 					<em>(a company, university or other body that you are associated with)</em>
 				</td>
 				<td class="concordgeneral">
-					<input type="text" size="50" maxlength="255" name="affiliation" 
+					<input id="affiliation" type="text" size="50" maxlength="255" name="affiliation" 
 					<?php
 					if ($prepop)
 						echo " value=\"{$prepop->affiliation}\" ";
@@ -505,10 +514,10 @@ function do_usr_ui_create()
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Please enter your location (select a country or territory):
+					<label for="country">Please enter your location (select a country or territory):</label>
 				</td>
 				<td class="concordgeneral">
-					<select name="country">
+					<select id="country" name="country">
 						<option selected value="00">Prefer not to specify</option>
 						<?php
 						$use_select = ( (! $prepop) || '00' == $prepop->country ? ' selected' : '');
@@ -581,10 +590,10 @@ function do_usr_ui_verify()
 						<table class="basicbox" style="margin:auto">
 							<tr>
 								<td class="basicbox">
-									Enter code here:
+									<label for="v">Enter code here:</label>
 								</td>
 								<td class="basicbox">
-									<input type="text" name="v" size="32" maxlength="32">
+									<input id="v" type="text" name="v" size="32" maxlength="32">
 								</td>
 							</tr>
 
@@ -716,9 +725,11 @@ function do_usr_ui_resend()
 					<input type="hidden" name="userAction" value="resendVerifyEmail">
 					<table class="basicbox" style="margin:auto">
 						<tr>
-							<td class="basicbox">Enter your email address:</td>
 							<td class="basicbox">
-								<input type="email" placeholder="your.address@somewhere.net" name="email" width="50">
+								<label for="email">Enter your email address:</label>
+							</td>
+							<td class="basicbox">
+								<input id="email" type="email" placeholder="your.address@somewhere.net" name="email" width="50">
 							</td>
 						</tr>
 						<tr>
@@ -754,10 +765,10 @@ function do_usr_ui_lostusername()
 				<form action="useracct-act.php" method="GET">
 					<input type="hidden" name="userAction" value="remindUsername">
 					<p>If you have lost or forgotten your username, you can request an email reminder.</p>
-					<p>Enter the email address you used to sign up in the text box below and press &rdquo;Request username reminder email&ldquo;.</p>
+					<p><label for="emailToRemind">Enter the email address you used to sign up in the text box below</label>label> and press &rdquo;Request username reminder email&ldquo;.</p>
 					<p>A message will be sent to your email with a reminder of your username.</p>
 					<p align="center">
-						<input type="email" placeholder="your.address@somewhere.net" name="emailToRemind" size="30" maxlength="255">
+						<input id="emailToRemind" type="email" placeholder="your.address@somewhere.net" name="emailToRemind" size="30" maxlength="255">
 					</p>
 					<p align="center">
 						<input type="submit" value="Request username reminder email">
@@ -790,9 +801,7 @@ function do_usr_ui_lostpassword()
 			<tr>
 				<td class="concordgeneral" colspan="2" align="center">
 					&nbsp;<br>
-					<strong>
-						An email has been sent to the address associated with your account. Please check your inbox!
-					</strong>
+					<strong>An email has been sent to the address associated with your account. Please check your inbox!</strong>
 					<br>&nbsp;
 				</td>
 			</tr>
@@ -837,10 +846,10 @@ function do_usr_ui_lostpassword()
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Enter your username:
+					<label for="userForResetRequest">Enter your username:</label>
 				</td>
 				<td class="concordgeneral">
-					<input type="text" size="40" maxlength="<?php echo HANDLE_MAX_USERNAME; ?>" name="userForPasswordReset">
+					<input id="userForResetRequest" type="text" size="40" maxlength="<?php echo HANDLE_MAX_USERNAME; ?>" name="userForResetRequest">
 				</td>
 			</tr>
 			<tr>
@@ -864,36 +873,36 @@ function do_usr_ui_lostpassword()
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Enter your username:
+					<label for="userForPasswordReset">Enter your username:</label>
 				</td>
 				<td class="concordgeneral">
-					<input type="text" size="40" maxlength="30" name="userForPasswordReset">
-				</td>
-			</tr>
-			<tr>
-				<td class="concordgeneral">
-					Enter your <strong>new</strong> password or passphrase:
-				</td>
-				<td class="concordgeneral">
-					<input type="password" size="40" maxlength="255" name="newPassword">
+					<input id="userForPasswordReset" type="text" size="40" maxlength="30" name="userForPasswordReset">
 				</td>
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Retype the <strong>new</strong> password or passphrase:
+					<label for="newPassword">Enter your <strong>new</strong> password or passphrase:</label>
 				</td>
 				<td class="concordgeneral">
-					<input type="password" size="40" maxlength="255" name="newPasswordCheck">
+					<input id="newPassword" type="password" size="40" maxlength="255" name="newPassword">
 				</td>
 			</tr>
 			<tr>
 				<td class="concordgeneral">
-					Enter the 32-letter verification code sent to you by email:
+					<label for="newPasswordCheck">Retype the <strong>new</strong> password or passphrase:</label>
+				</td>
+				<td class="concordgeneral">
+					<input id="newPasswordCheck" type="password" size="40" maxlength="255" name="newPasswordCheck">
+				</td>
+			</tr>
+			<tr>
+				<td class="concordgeneral">
+					<label for="v">Enter the 32-letter verification code sent to you by email:</label>
 					<br>
 					<em>(spaces optional)</em>
 				</td>
 				<td class="concordgeneral">
-					<input type="text" size="40" maxlength="40" name="v">
+					<input id="v" type="text" size="40" maxlength="40" name="v">
 				</td>
 			</tr>
 			<tr>
@@ -1320,7 +1329,7 @@ function do_usr_ui_corpusaccess()
 			<td colspan="3" class="concordgrey">
 				<p class="spacer">&nbsp;</p>
 				<p>
-					If you think that you should have permissiona for more corpora than are listed above, 
+					If you think that you should have permissions for more corpora than are listed above, 
 					you should contact the system administrator, explaining which corpora you wish to use,
 					and on what grounds you believe you have permission to use them.
 				</p>

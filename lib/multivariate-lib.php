@@ -954,7 +954,7 @@ function print_feature_matrix_as_text_table($id, $return_string = false)
 
 
 
-
+// TODO should be "get all"
 /**
  * Lists all the variables in a given feature matrix.
  *
@@ -971,7 +971,7 @@ function feature_matrix_list_variables($id)
 
 // 	return $list;
 	
-	return list_sql_values("select * from saved_matrix_features where matrix_id = ". (int)$id);
+	return get_all_sql_objects("select * from saved_matrix_features where matrix_id = ". (int)$id);
 }
 
 

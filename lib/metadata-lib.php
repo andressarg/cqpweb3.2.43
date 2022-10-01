@@ -728,7 +728,7 @@ function create_text_metadata_get_bad_ids($corpus, $field)
 	$corpus = escape_sql($corpus);
 	$field  = escape_sql($field);
 
-	$result = do_sql_query("select distinct `$field` from text_metadata_for_$corpus where `$field` REGEXP '[^A-Za-z0-9_]'");
+	$result = do_sql_query("select distinct `$field` from `text_metadata_for_$corpus` where `$field` REGEXP '[^A-Za-z0-9_]'");
 	if (0 == mysqli_num_rows($result))
 		return false;
 
@@ -1204,4 +1204,11 @@ class VagueDate
 		
 	}
 }
+
+
+
+
+
+
+
 

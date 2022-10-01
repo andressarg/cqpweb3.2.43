@@ -24,29 +24,38 @@
  * functions for expanding the "insert corpus/xml metadata" & metadata template forms
  */
 
-function add_metadata_form_row()
+function add_metadata_form_row(field_count_id = "fieldCount", show_primary_classification = true, form_id = null)
 {
 	/* get the number of the row to create */
-	var row_number = 1 + parseInt( $("#fieldCount").val() );
+	// fixme, won;t work if page contains more than one idlink install table. 
+	var row_number = 1 + parseInt( $("#" + field_count_id).val() );
+
+	form_marker = '';
+	if (form_id)
+		form_marker = 'form="' + form_id + '" ';
+
+	col5 = '';
+	if (show_primary_classification)
+		col5 = `<td class="concordgeneral" align="center">
+					<input ${form_marker}type="radio" id="primaryClassification:${row_number}" name="primaryClassification" value="${row_number}"/>
+				</td>`;
 
 	/* create the new row element */
 	var new_row = $("\
 			<tr>\
 				<td class=\"concordgeneral\">Field " + row_number + "</td>\
 				<td class=\"concordgeneral\" align=\"center\">\
-					<input type=\"text\" name=\"fieldHandle" + row_number + "\" maxlength=\"64\" onKeyUp=\"check_c_word(this)\" />\
+					<input " + form_marker + "type=\"text\" name=\"fieldHandle" + row_number + "\" maxlength=\"64\" onKeyUp=\"check_c_word(this)\" />\
 				</td>\
 				<td class=\"concordgeneral\" align=\"center\">\
-					<input type=\"text\" name=\"fieldDescription" + row_number + "\" maxlength=\"255\"/>\
+					<input " + form_marker + "type=\"text\" name=\"fieldDescription" + row_number + "\" maxlength=\"255\"/>\
 				</td>\
 				<td class=\"concordgeneral\" align=\"center\">\
-					<select name=\"fieldType" + row_number + "\" align=\"center\">\
+					<select " + form_marker + "name=\"fieldType" + row_number + "\" align=\"center\">\
 						<!-- options to go here -->\
 					</select>\
 				</td>\
-				<td class=\"concordgeneral\" align=\"center\">\
-					<input type=\"radio\" name=\"primaryClassification\" value=\"" + row_number + "\"/>\
-				</td>\
+				" + col5 +"\
 			</tr>\
 		");
 	/* insert the row into the DOM before the row containing the button */
@@ -57,6 +66,6 @@ function add_metadata_form_row()
 	$("select[name=fieldType" + row_number + "]").append(opts);
 
 	/* and finally, update the number of rows. */
-	$("#fieldCount").val(row_number.toString());
+	$("#" + field_count_id).val(row_number.toString());
 	
 }

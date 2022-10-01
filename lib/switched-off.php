@@ -26,7 +26,7 @@ if (isset($Config))
 		exit( $Config->Api->raise_error(API_ERR_SWITCHED_OFF) ? 0 : 1);
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="UTF-8">
 		<title>CQPweb is switched off!</title>

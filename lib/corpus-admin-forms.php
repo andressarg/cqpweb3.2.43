@@ -828,7 +828,7 @@ function do_ui_managemeta()
 				
 				<table class="concordtable fullwidth">
 					<tr>
-						<th class="concordtable" colspan="5" >Create metadata table from corpus XML annotations</th>
+						<th class="concordtable" colspan="5" >Create text metadata table from corpus XML</th>
 					</tr>
 					<?php
 					$possible_xml = get_all_xml_info($Corpus->name);
@@ -871,6 +871,14 @@ function do_ui_managemeta()
 								their use as metadata fields. However, the datatype cannot be changed. 
 								
 								<br>&nbsp;<br>
+							</td>
+						</tr>
+						<tr>
+							<td class="concordgrey" colspan="3" valign="middle">
+								Auto-select all attributes of the &lt;text&gt; element?
+							</td>
+							<td class="concordgrey" colspan="2" align="center">
+								<button type="button" onclick="$('[name^=&quot;createMetadataFromXmlUse_&quot;]').prop('checked', true);">Select text attributes!</button>
 							</td>
 						</tr>
 						<tr>
@@ -1330,7 +1338,7 @@ function do_ui_managefreqlists()
 		{
 			$message = 'The word count tables for the different text classification categories in this corpus ';
 			
-			$sql = "select handle from text_metadata_values where corpus = '{$Corpus->name}' and category_num_words IS NOT NULL limit 1";
+			$sql = "select handle from text_metadata_values where corpus = '{$Corpus->name}' and category_num_words > 0 limit 1";
 			if ( 0 < mysqli_num_rows(do_sql_query($sql)) )
 			{
 				$ok = true;
@@ -1373,43 +1381,67 @@ function do_ui_managefreqlists()
 		/* ==================================================== */
 		
 		
-		$message = "CWB text-by-text frequency lists are used to generate subcorpus frequency lists (important for keywords, collocations etc.)<br>\n\t\t\t\t";
-		
-		if (check_cwb_freq_index($Corpus->name))
+		$message = "The CWB text-by-text frequency index is used to generate subcorpus frequency lists (important for keywords, collocations etc.)<br>\n\t\t\t\t";
+
+		if (2 > $Corpus->size_texts)
 		{
-			$ok = true;
-			$message .= 'The text-by-text list for this corpus <strong>has already been created</strong>. Use the button to delete and recreate it.';
-			$button_label = 'Recreate CWB frequency table';
+			$message .= "This corpus only contains one text. Using a text-by-text frequency index is therefore <strong>neither necessary nor desirable.</strong>";
+			?>
+			
+			<tr>
+				<td class="concordgrey" valign="middle">Text-by-text frequency index</td>
+				<td class="concordgeneral" align="center" valign="middle">&nbsp;</td>
+				<td class="concordgeneral" valign="middle">
+					<?php echo $message, "\n"; ?>
+				</td>
+				<td class="concordgeneral" align="center">
+					<p class="spacer">&nbsp;</p>
+					<p>&nbsp;</p>
+					<p class="spacer">&nbsp;</p>
+				</td>
+			</tr>
+			
+			<?php
+		
 		}
-		else
+		else 
 		{
-			$ok = false;
-			$message .= 'The text-by-text list for this corpus <strong>has not yet been created</strong>. Use the button to generate it.';
-			$button_label = 'Create CWB frequency table';
+			if (check_cwb_freq_index($Corpus->name))
+			{
+				$ok = true;
+				$message .= 'The text-by-text index for this corpus <strong>has already been created</strong>. Use the button to delete and recreate it.';
+				$button_label = 'Recreate CWB frequency table';
+			}
+			else
+			{
+				$ok = false;
+				$message .= 'The text-by-text index for this corpus <strong>has not yet been created</strong>. Use the button to generate it.';
+				$button_label = 'Create CWB frequency table';
+			}
+			?>
+			
+			<tr>
+				<td class="concordgrey" valign="middle">Text-by-text frequency lists</td>
+				<td class="<?php echo $ok ? 'concordgeneral' : 'concorderror'; ?>" align="center" valign="middle">
+					<strong><?php echo $ok? 'OK!' : 'Unready'; ?></strong>
+				</td>
+				<td class="concordgeneral" valign="middle">
+					<?php echo $message, "\n"; ?>
+				</td>
+				<td class="concordgeneral" align="center">
+					<p class="spacer">&nbsp;</p>
+					<form class="greyoutAreYouSure" data-areYouSureQ="Are you sure you want to do this? It can take some time!" action="execute.php" method="get">
+						<input type="hidden" name="function"      value="make_cwb_freq_index">
+						<input type="hidden" name="args"          value="<?php echo $Corpus->name; ?>">
+						<input type="hidden" name="locationAfter" value="index.php?ui=manageFreqLists">
+						<p><input type="submit" value="<?php echo $button_label; ?>"></p>
+					</form>
+					<p class="spacer">&nbsp;</p>
+				</td>
+			</tr>
+			
+			<?php
 		}
-		?>
-		
-		<tr>
-			<td class="concordgrey" valign="middle">Text-by-text frequency lists</td>
-			<td class="<?php echo $ok ? 'concordgeneral' : 'concorderror'; ?>" align="center" valign="middle">
-				<strong><?php echo $ok? 'OK!' : 'Unready'; ?></strong>
-			</td>
-			<td class="concordgeneral" valign="middle">
-				<?php echo $message, "\n"; ?>
-			</td>
-			<td class="concordgeneral" align="center">
-				<p class="spacer">&nbsp;</p>
-				<form class="greyoutAreYouSure" data-areYouSureQ="Are you sure you want to do this? It can take some time!" action="execute.php" method="get">
-					<input type="hidden" name="function"      value="make_cwb_freq_index">
-					<input type="hidden" name="args"          value="<?php echo $Corpus->name; ?>">
-					<input type="hidden" name="locationAfter" value="index.php?ui=manageFreqLists">
-					<p><input type="submit" value="<?php echo $button_label; ?>"></p>
-				</form>
-				<p class="spacer">&nbsp;</p>
-			</td>
-		</tr>
-		
-		<?php
 		
 		
 		/* ==================================================== */
@@ -1561,40 +1593,45 @@ function do_ui_managexml()
 			$id = "desc-{$x->corpus}-{$x->handle}";
 			$x->description = escape_html($x->description); /* because it is always going to be rendered. */
 			
-			$descform = '
+			$descform = <<<END_OF_FORM
+
 				&nbsp;
 				<form class="greyoutOnSubmit" action="execute.php" method="get"
 					onSubmit="
-						/* add corpus and handle arguments to the description (Aftger hiding it from the user) */
-						var t = $(\'#' . $id . '\').css(\'visibility\', \'hidden\').val(); 
- 						$(\'#' . $id . '\').val(\'' . $x->corpus . '#' . $x->handle . '#' . '\' + t); 
+						/* add corpus and handle arguments to the description (after hiding it from the user) */
+						var t = $('#$id').css('visibility', 'hidden').val(); 
+ 						$('#$id').val('$x->corpus#$x->handle#' + t); 
  						return true;
 						"
 				>
 					<input type="hidden" name="function"      value="update_xml_description">
 					<input type="hidden" name="locationAfter" value="index.php?ui=manageXml">
-					<input type="text"   name="args" id="' . $id . '" maxlength="255" value="' . $x->description . '">
+					<input type="text"   name="args" id="$id" maxlength="255" value="$x->description">
 					<input type="submit" value="Update!">
 				</form>
-			';
+
+END_OF_FORM;
 			
 			$typeopts = '';
-			foreach($Config->metadata_type_descriptions as $const=>$desc)
+			foreach($Config->metadata_type_descriptions as $const => $desc)
 				if ($x->datatype != $const)
 					if (METADATA_TYPE_NONE != $const)
 						$typeopts .= '<option value="' . $const . '">' . $desc . '</option>';
-			$typeform = '
+					
+			$typeform = <<<END_OF_FORM
+
 				&nbsp;
 				<form class="greyoutAreYouSure" action="metadata-act.php" method="get">
 					<input type="hidden" name="mdAction" value="xmlChangeDatatype">
-					<input type="hidden" name="handle"   value="' . $x->handle . '">
+					<input type="hidden" name="handle"   value="$x->handle">
 					<select name="newDatatype">
 						<option value="~~NULL" selected>Change datatype to...</option>
-						' . $typeopts . '
+						$typeopts
 					</select>
 					<input type="submit" value="Change">
 				</form>
-			';
+
+END_OF_FORM;
 			
 			
 			echo "\n\t\t<tr>"
@@ -1746,7 +1783,7 @@ function do_ui_managexml()
 						Choose the file containing the metadata
 						<form  id="createXmlIdlinkTableForm:<?php echo $x->handle; ?>" class="greyoutOnSubmit" action="metadata-act.php" method="get"></form>
 						<input form="createXmlIdlinkTableForm:<?php echo $x->handle; ?>" type="hidden" name="mdAction" value="createXmlIdlinkTable">
-						<input form="createXmlIdlinkTableForm:<?php echo $x->handle; ?>" type="hidden" name="fieldCount" id="fieldCount" value="<?php echo $n_embiggenable_rows;?>">
+						<input form="createXmlIdlinkTableForm:<?php echo $x->handle; ?>" type="hidden" name="fieldCount" id="fieldCount:<?php echo $x->handle; ?>" value="<?php echo $n_embiggenable_rows;?>">
 						<input form="createXmlIdlinkTableForm:<?php echo $x->handle; ?>" type="hidden" name="corpus" value="<?php echo $Corpus->name; ?>">
 						<input form="createXmlIdlinkTableForm:<?php echo $x->handle; ?>" type="hidden" name="xmlAtt" value="<?php echo $x->handle; ?>">
 					</th>
@@ -1815,7 +1852,7 @@ function do_ui_managexml()
 				
 // TODO might some of the above be put-into-funcs-able?
 				
-				echo print_embiggenable_metadata_form($n_embiggenable_rows, false, 'createXmlIdlinkTableForm'.$x->handle); 
+				echo print_embiggenable_metadata_form($n_embiggenable_rows, false, 'createXmlIdlinkTableForm:'.$x->handle, 'fieldCount:'.$x->handle); 
 				
 				?>
 				<tr>
@@ -3746,7 +3783,6 @@ function do_ui_showquerycache()
 		<tr>
 		
 		<?php
-		// TODO clean up these buttons!
 		$return_to_url = urlencode('index.php?ui=cachedQueries');
 		
 		echo '<th width="50%" class="concordtable">'
@@ -3762,9 +3798,7 @@ function do_ui_showquerycache()
 				, $return_to_url
 			, '">Clear entire cache<br>(but keep saved queries)</a></th>'
 	 		, '<th width="50%" class="concordtable">Clear entire cache<br>(clear all saved queries)<br>(function removed)</th>'
-			, '</td></tr></table>'
 	 		; 
-		// no reason why the abnove is an echo: make it HTML
 		?>
 		
 		</tr>

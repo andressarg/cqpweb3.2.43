@@ -281,7 +281,7 @@ require("../lib/istream-lib.php");
  * If a Query Scope refers to a Restriction, then its serialisation is the SAME AS THAT OF THE RESTRICTION.
  * 
  * If a Query Scope refers to a saved Subcorpus, then its serialisation is a string containing 
- * the integer ID of the Subcorpus, represented as a decimal wihtin the string, which therefore will match 
+ * the integer ID of the Subcorpus, represented as a decimal within the string, which therefore will match 
  * the regular expression ^\d+$    ....
  * 
  * There is one special case here: when a record is preserved of a Query Scope that refers to a Subcorpus
@@ -363,6 +363,7 @@ require("../lib/istream-lib.php");
  * ^^^
  * 
  * (note we keep all three to make life easy should we ever apply the explode/unshift pattern to it!)
+ * TODO: add note, how is an empty sc represented? as an empty restriction, ssee below. 
  * 
  * When the Subcorpus object is asked what kind of "item" is contains, it reports the contents of the 
  * FIRST field - that is, the attribute-family (incl. "text", if this is texts). IF the first field is 
@@ -383,21 +384,21 @@ require("../lib/istream-lib.php");
  * "children" are found in the text_metadata table, rather than in the CWB index.)
  * 
  * If the criteria all relate to just one s-attribute family (say, <u>), then the Restriction 
- * is equal to a set of complete ranges of that s-atrtribute: it contains the whole of the set of
+ * is equal to a set of complete ranges of that s-attribute: it contains the whole of the set of
  * <u>-to-</u> ranges that satisfy those criteria.
  * 
  * However, if the criteria relate to more than one s-attribute family (say, <u> and <s>; or <u>
  * and the special "text") then we can make no assumptions about anything. In this case, the Restriction
  * is equal to some collection of cpos pairs, representing that slice of the corpora that is selected
- * by ALL the criteria. (We cannot even assume nesting of everythihng other than <text> within <text>:
+ * by ALL the criteria. (We cannot even assume nesting of everything other than <text> within <text>:
  * there is nothing in the indexing rules to stop people using XML elements that are bigger than <text>
  * or that end halfway throught <text>.)
  * 
  * The magic number distinguishes these.
  * 
- * The magic number if there are conditions on either just texts, or just one family of elements, is @.
+ * The magic number if there are conditions on either just texts, or just one family of elements, is $.
  * 
- * The magic number if there are conditions on multiple elements, or text plus an element, is $.
+ * The magic number if there are conditions on multiple elements, or text plus an element, is @.
  * 
  * In either case, condition-sets are delimited with a ^. So the overall format is
  * 
@@ -426,7 +427,7 @@ require("../lib/istream-lib.php");
  * where: 
  * 
  * ELEMENT is either the special flag "--text" or the name of the s-attribute; 
- * FIELD specifies what attribute, or IDLINK'ed; column, the condition aopplies to; 
+ * FIELD specifies what attribute, or IDLINK'ed; column, the condition applies to; 
  * and VALUE is what the field must match.
  * 
  * If the same FIELD is specified multiple times, that's an OR condition. 
@@ -502,10 +503,22 @@ require("../lib/istream-lib.php");
  * And that, I believe, is all.
  * 
  * The description of how these things are passed around in URLs can be found in the comments on the relevant
- * methods in the Restriciton class. Briefly: if the Restriction (or Subcorpus or Query Scope) is being passed 
+ * methods in the Restriction class. Briefly: if the Restriction (or Subcorpus or Query Scope) is being passed 
  * around from a form the user interacts with, a slightly more complex format is used. If it is being passed 
  * around in a unitary manner, then it is fine just to pass the serialisation as a single HTTP parameter.
  */
+
+/*
+ * TO ADD TO THE ABOVE
+ * 
+ * A REstriction might be empty if its conditions rule out all positions in the corpus.
+ * Such a restriction can be coded by its conditions (which nmay not yet be known to be empty)
+ * OR by the foillowing additional magic byte
+ * E   for epsilon.
+ * 
+ * 
+ */
+
 
 /*
  * A MASSIVE AND IMPORTANT TODO FOR RESTRICTIONS
@@ -559,8 +572,12 @@ class QueryScope
 	/** variable that indicates which type of scope this is. */
 	public $type;
 	
-	/** IF this is the whole corpus; we stash its name here. There is a set_ function in 
-	 *  case this object is initialised outside its "home" corpus. */ 
+	/** iff this QS represents the whole corpus, we stash its name here. 
+	 *  There is a set_ function in  case this object is initialised outside its "home" corpus. 
+	 *  Otherwise, this variable should be NULL, and never used, if the type is not 
+	 *  TYPE_EMPTY or TYPE_WHOLE_CORPUS. 
+	 *  
+	 */ 
 	private $whole_corpus_name;
 	
 	/** if this is a Restriction the object goes here. */
@@ -578,6 +595,10 @@ class QueryScope
 		/* do nothing */
 	}
 	
+
+// TODO. Do the QS functions require the opption of a corpus passthru?
+// Restriction has it, so QS probably should. 
+
 	
 	/**
 	 * Creates a Query Scope object by parsing an HTTP query string (or fragment), such as that 
@@ -622,10 +643,27 @@ class QueryScope
 		$o = new self();
 		$o->type = self::TYPE_SUBCORPUS;
 		$o->subcorpus = $sc;
-		$o->whole_corpus_name = $sc->corpus;
 // 		$o->serialised =  hmm, what???
+//FIXME this is still buggy. ccompare to new_by_unserialise with the sc's ID, and what you get is not the same. 
 		return $o;
 	}
+	
+	
+	
+	/**
+	 * Create a new query scope that is empty (i.e. none of the corpus matches).
+	 * 
+	 * An empty scope doesn't bother with an empty restriction (that's why we have TYPE_EMPTY)
+	 */
+	public static function new_empty()
+	{
+		$o = new self();
+		$o->type = self::TYPE_EMPTY;
+		$o->serialised = "E";
+		// TODO, I believe this is the whole of it?
+		return $o;	
+	}
+
 	
 	
 	/**
@@ -700,13 +738,16 @@ class QueryScope
 				$this->restriction = $r;
 				$this->serialised = $this->restriction->serialise();
 				if (0 == $this->restriction->size_tokens())
+				{
 					$this->type = self::TYPE_EMPTY;
+					$this->restriction = NULL;
+				}
 				else
 					$this->type = self::TYPE_RESTRICTION;
 			}
 		}
 		
-		if (self::TYPE_WHOLE_CORPUS == $this->type)
+		if (self::TYPE_WHOLE_CORPUS == $this->type || self::TYPE_EMPTY == $this->type)
 		{
 			/* if it was not found to be RESTRICTION or SUBCORPUS,  
 			   take the whole corpus name from a global setting. */
@@ -745,8 +786,11 @@ class QueryScope
 		else
 		{
 			/* ANYTHING ELSE: this Scope refers to a Restriction */
-			$this->type = self::TYPE_RESTRICTION;
 			$this->restriction = Restriction::new_by_unserialise($this->serialised);
+			if (0 == $this->restriction->size_tokens())
+				$this->type = self::TYPE_EMPTY;
+			else
+				$this->type = self::TYPE_RESTRICTION;
 //show_var($this->restriction);
 		}
 	}
@@ -847,32 +891,49 @@ class QueryScope
 		
 		switch ($this->type)
 		{
+		case QueryScope::TYPE_EMPTY:
+			return QueryScope::new_empty();
+			
 		case QueryScope::TYPE_WHOLE_CORPUS:
 			return $other_scope;
 			
 		case QueryScope::TYPE_SUBCORPUS:
-squawk("Qscope ::: get_intersect_with_restriction");
+squawk("Qscope ::: get_intersect of subcorpus with restriction, or two subcorpora");
 			/* first major sort: subcorpus + restriction */
 			if ($other_scope->type == QueryScope::TYPE_RESTRICTION)
-				return $this->subcorpus->get_intersect_with_restriction($other_scope->restriction); //TODO this will passthru to R::get_intersect one hopes.
+				return $this->subcorpus->get_intersect_with_restriction($other_scope->restriction);
 			
 			/* second major sort: subcorpus + subcorpus */
 			if ($other_scope->type == QueryScope::TYPE_SUBCORPUS)
-				; // ??????? TODO .... at the moment it returns false.
+			{
+				//FIXME - here, we need to create an anon subcorpus from the intersect of the subcorpora.
+				// Then, wrap in a QS and return. 
+				// Subcorpus should have a method for this. 
+				return false;
+			}
 			
 			break;
 			
 		case QueryScope::TYPE_RESTRICTION:
 squawk("Qscope ::: get_intersect");
+//echo "\nQscope ::: get_intersect I am a restriciton.\n";
 			/* third major sort: restriction + restriction */
 			if ($other_scope->type == QueryScope::TYPE_RESTRICTION)
 				return $this->restriction->get_intersect($other_scope->restriction);
+//{echo " My firend is a restriciton";  $xx = $this->restriction->get_intersect($other_scope->restriction); if (is_null($xx)){var_dump($this, $other_scope);exit();}
+//return $xx;
+//}
+# problem is, R::get_intersect is returning NULL
 
-			/* switcheroo */
+
+
+			/* switcheroo --> makes it like the FIRST major sort, above */
 			if ($other_scope->type == QueryScope::TYPE_SUBCORPUS)
 				return $other_scope->get_intersect($this);
 
 			break;
+
+default:echo "should not be reached"; var_dump($other_scope); exit;
 		}
 		
 		/* all possible combinations have now been dealt with. */
@@ -942,7 +1003,7 @@ squawk("Qscope ::: get_intersect");
 	/**
 	 * Get the freqtable record (associative array) for this Query Scope's internal Subcorpus or Restriction. 
 	 * 
-	 * Returns false if there isn't one, or if this Scope is Whole Corpus. 
+	 * Returns NULL if there isn't one, or if this Scope is Whole Corpus / Empty. 
 	 */
 	public function get_freqtable_record()
 	{
@@ -953,7 +1014,7 @@ squawk("Qscope ::: get_intersect");
 		case self::TYPE_RESTRICTION:
 			return $this->restriction->get_freqtable_record();
 		default:
-			return false;
+			return NULL;
 		}
 	}
 	
@@ -966,12 +1027,13 @@ squawk("Qscope ::: get_intersect");
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return 0;
+			
 		case self::TYPE_WHOLE_CORPUS:
 			return get_corpus_n_tokens($this->get_corpus());
 			
 		case self::TYPE_RESTRICTION:
-// show_var($this->restriction);
-// show_var($this);
 			return $this->restriction->size_tokens();
 			
 		case self::TYPE_SUBCORPUS:
@@ -985,8 +1047,12 @@ squawk("Qscope ::: get_intersect");
 	 */
 	public function size_items(&$item = NULL)
 	{
+		//TODO 3.3. get rid of the out-param.
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return 0;
+		
 		case self::TYPE_WHOLE_CORPUS:
 			$item = 'text';
 			return get_corpus_n_texts($this->get_corpus());
@@ -1005,8 +1071,12 @@ squawk("Qscope ::: get_intersect");
 	 */
 	public function size_ids(&$item = NULL)
 	{
+		//TODO 3.3. get rid of the out-param.
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return 0;
+		
 		case self::TYPE_WHOLE_CORPUS:
 			$item = 'text';
 			return get_corpus_n_texts($this->get_corpus());
@@ -1021,13 +1091,13 @@ squawk("Qscope ::: get_intersect");
 	
 	
 	
-		
-	
-	
 	public function get_item_type()
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return '';
+			
 		case self::TYPE_RESTRICTION:
 			return $this->restriction->get_item_type();
 			
@@ -1036,11 +1106,15 @@ squawk("Qscope ::: get_intersect");
 		}
 		return false;
 	}
+
 	
 	public function get_item_identifier()
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return '';
+		
 		case self::TYPE_RESTRICTION:
 			return $this->restriction->get_item_identifier();
 			
@@ -1052,16 +1126,19 @@ squawk("Qscope ::: get_intersect");
 	
 	
 	
-	/** Gets list of items in the subcorpus or retriction. Out parameters tell you what type of item it is. Returns false if we can't get a list of items.*/
-	public function get_item_list(&$item_type = NULL, &$item_identifier = NULL)
+	/** Gets list of items in the subcorpus or restriction. Returns false if we can't get a list of items.*/
+	public function get_item_list()
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return [];
+			
 		case self::TYPE_RESTRICTION:
-			return $this->restriction->get_item_list($item_type, $item_identifier);
+			return $this->restriction->get_item_list();
 			
 		case self::TYPE_SUBCORPUS:
-			return $this->subcorpus->get_item_list($item_type, $item_identifier);
+			return $this->subcorpus->get_item_list();
 		}
 		return false;
 	}
@@ -1071,6 +1148,7 @@ squawk("Qscope ::: get_intersect");
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
 		case self::TYPE_WHOLE_CORPUS:
 			return $this->whole_corpus_name;
 		case self::TYPE_RESTRICTION:
@@ -1079,7 +1157,6 @@ squawk("Qscope ::: get_intersect");
 			return $this->subcorpus->corpus;
 		}
 		return false;
-		
 	}
 	
 	
@@ -1143,6 +1220,9 @@ squawk("Qscope ::: get_intersect");
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return '0';
+		
 		case self::TYPE_WHOLE_CORPUS:
 			assert(false, "Please report a Critical Logic Bug:: QScope has executed code that we thought was not reached. ");
 			return number_format(get_corpus_n_texts($this->get_corpus()));
@@ -1156,14 +1236,41 @@ squawk("Qscope ::: get_intersect");
 	}
 	
 	
+	/**
+	 * Printable string for size in IDs.
+	 */
+	public function print_size_ids()
+	{
+		switch ($this->type)
+		{
+		case self::TYPE_EMPTY:
+			return '0';
+		
+		case self::TYPE_WHOLE_CORPUS:
+			assert(false, "Please report a Critical Logic Bug:: QScope has executed code that we thought was not reached. ");
+//			return number_format(get_corpus_n_texts($this->get_corpus()));
+			
+		case self::TYPE_RESTRICTION:
+			return $this->restriction->print_size_ids();
+			
+		case self::TYPE_SUBCORPUS:
+			return $this->subcorpus->print_size_ids();
+		}
+	}
+	
+	
 	public function print_size_tokens()
 	{
 		switch ($this->type)
 		{
+		case self::TYPE_EMPTY:
+			return '0';
+			
 		case self::TYPE_WHOLE_CORPUS:
 			assert(false, "Please report a Critical Logic Bug:: QScope has executed code that we thought was not reached. ");
 			global $Corpus;
 			return number_format($Corpus->size_tokens);
+			// TODO
 			
 		case self::TYPE_RESTRICTION:
 			return $this->restriction->print_size_tokens();
@@ -1217,7 +1324,8 @@ class Restriction
 	 * it's an array where the idlink attribute (full, i.e. like "u_who") is the key. */
 	private $stored_idlink_where;
 	
-	/** Contains the collected cpos for this Restriction; an array of arrays where each inner array has a [begin,end] pair at keys 0 and 1. */
+	/** Contains the collected cpos for this Restriction; an array of arrays where each inner array has a [begin,end] pair at keys 0 and 1. 
+	 *  An empty Restriction has an empty array here. */
 	private $cpos_collection = NULL;
 	
 	/** corpusname that this belongs to (prob wee could get away for now using the global $Corpus, but let's be future-proof) */
@@ -1237,7 +1345,7 @@ class Restriction
 	/** number of items in the Restriction. */
 	private $n_items;
 	
-	/** number of tokens in the Restriction. */
+	/** number of tokens in the Restriction. This can be zero if the Restriction matches no part of the corpus. */
 	private $n_tokens;
 
 	/** Freqtable record (an stdClass from the database). Set to NULL when this has not been checked yet. Set to false if there is no table. */
@@ -1257,7 +1365,7 @@ class Restriction
 	private $hasrun_initialise_size = false;
 	
 	
-	/** whether the internal data (cpos cokllection, sizes) should be added to the restriction cache 
+	/** whether the internal data (cpos collection, sizes) should be added to the restriction cache 
 	 * (assume not until some function runs that implies it needs to be!) */
 	private $needs_to_be_added_to_cache = false;
 	
@@ -1296,7 +1404,7 @@ class Restriction
 		$o->set_corpus($corpus);
 		$o->serialised = $input;
 		if (! $o->parse_serialisation())
-			return false;		
+			return false;
 		$o->retrieve_from_cache();
 		$o->initialise_size();
 		/* BEFORE RETURNING: call the commit method, which will take effect 
@@ -1306,7 +1414,6 @@ class Restriction
 	}
 	
 	
-
 	
 	
 	/**
@@ -1330,6 +1437,31 @@ class Restriction
 		/* BEFORE RETURNING: call the commit method, which will take effect 
 		 * iff the correct var was set to "true" in the init functions. */
 		$o->commit_to_cache();
+		return $o;
+	}
+	
+	
+	
+	public static function new_empty($corpus = NULL)
+	{
+		$o = new self();
+		$o->set_corpus($corpus);
+		
+		/* we can do all the setup right here. */
+		$o->n_tokens = $o->n_items = $o->n_ids = 0;
+		$o->hasrun_initialise_size = true;
+		
+		$o->cpos_collection = [];
+		$o->hasrun_initialise_cpos_collection = true;
+		
+		$o->stored_idlink_where = " (0) ";
+		$o->hasrun_initialise_idlink_where = true;
+		
+		$o->stored_text_metadata_where = " (0) ";
+		$o->hasrun_initialise_text_metadata_where = true;
+		
+		$o->serialised = "E";
+		
 		return $o;
 	}
 	
@@ -1368,12 +1500,23 @@ class Restriction
 			else
 			{
 				/* this is a condition on text metadata; OR, this is a condition on something xml ish; 
-				 * we don't parse further, or do anything different for the two cases; we might decide to later. */ 
+				 * we don't parse further, or do anything different for the two cases at this point. */ 
 				list($s_att, $conditionlist) = explode('|', $cset);
+				if (empty($conditionlist))
+				{
+					/* this can happen*/
+				}
 				$this->parsed_conditions[$s_att] = explode('.', $conditionlist);
-				/* so each member of p_c[[s_att]] is a list of FIELD~VALUE strings applied to that s_att. */
+				/* so each member of p_c[[s_att]] is a IDLINK/FIELD~VALUE or ATT~VALUE string applied to that s_att. */
 			}
 		}
+		
+// 		if (empty($this->parsed_conditions))
+// 		{
+// 			// Zero-sized slice of the corpus.
+// 			$this->n_ids = $this->n_items = $this->nm_tokens = 0;
+// 		}
+		
 		
 		/* parse the item type */
 		if ($start_flag == '$')
@@ -1392,7 +1535,7 @@ class Restriction
 			{
 				$this->item_identifier = '';
 				/* we have the item type, but to get the item identifier, 
-				 * we need to check whether these are idlinked (and they do all need checking) */
+				 * we need to check whether every condition uses the same idlink (and they do all need checking) */
 				if (preg_match('|^([^/]+)/[^~]+~|', $this->parsed_conditions[$this->item_type][0], $m))
 				{
 					$this->item_identifier = $m[1];
@@ -1400,6 +1543,7 @@ class Restriction
 					{
 						if (!preg_match("|^{$this->item_identifier}/[^~]+~|", $this->parsed_conditions[$this->item_type][$i]))
 						{
+							/* a 2nd or subsequent condition uses a different ID link, or no ID link at all: so identifier is empty. */
 							$this->item_identifier = '';
 							break;
 						}
@@ -1409,9 +1553,10 @@ class Restriction
 		}
 		else if ($start_flag == '@')
 		{
-			/* multiple conditions sets */
+			/* multiple condition sets */
 			$this->item_type = '@';
 			$this->item_identifier = '';
+			// FIXME if there are two types of condition, and text is one of them, then the other persists as the item type (since nothing crosses text)
 		}
 		else
 			return false;
@@ -1584,7 +1729,7 @@ class Restriction
 		
 		$conds = array();
 		
-//var_dump($this);
+//var_dump("PARSCONDS: ", $this->parsed_conditions);
 		foreach ($this->parsed_conditions['--text'] as $c)
 		{
 			if (false === strpos($c, '/'))
@@ -1831,6 +1976,7 @@ squawk("initialise size =- entering fallback to initialise cpos");
 squawk("initialise size = done with initialise cpos");
 		
 		$this->n_items = count($this->cpos_collection);
+//var_dump($this->cpos_collection, $this->n_items);
 		
 		$this->n_tokens = 0;
 		foreach($this->cpos_collection as $pair)
@@ -1869,7 +2015,7 @@ squawk("initialise size = done with initialise cpos");
 // it would make more sense to REDUCE the first collection on the fly.
 // but that will require a complete re-factor to do the merge as each new pair of positions is read, rather than having a
 // generic intersect function.
-// an alternative idea: when using CQP to get s-attreibutes, if there is already a cpos collection, undump and activate it???
+// an alternative idea: when using CQP to get s-attributes, if there is already a cpos collection, undump and activate it???
 // then get only ranges within that?
 // OR simply do all the intersecting in CQP instead by undumping each collection, then freeing its php memory?
 // because CQP is in C, that will require less RAM per cpos-pair than having an array-of-two-integers in PHP
@@ -1921,8 +2067,9 @@ squawk("entering ~~ within  branch");
 // 				pclose($source);
 squawk("opening xml stream for $this->corpus, $att");
 				$source = open_interval_stream(IntervalStream::OPEN_XML_ATTRIBUTE, $this->corpus, $att, false);
-				while ($a =$source->get())
-					$new_collection[] = $a;
+				while ($a = $source->get())
+					$new_collection[] = $a; 
+				// TODO, instead of looping externally, make get_full() an istream method
 				$source->close();
 			}
 			else
@@ -1995,13 +2142,16 @@ squawk("entering idlinks only  branch");
 						foreach(list_sql_values("select `__DATA` from `$table` where {$this->stored_idlink_where[$id_att]}") as $blob)
 							$local_collection = array_merge($local_collection, untranslate_restriction_cpos_from_db($blob));
 						
-						sort($local_collection, SORT_NUMERIC);
 						if (empty($new_collection))
 							$new_collection = $local_collection;
 						else
-							$new_collection = array_values(array_intersect($new_collection, $local_collection)); 
-						/* intervals must match the requirements laid down for ALL idlink-type atts. 
-						 * no need for a sort here, since the  */
+							$new_collection = array_intersect($new_collection, $local_collection);
+//FIXME array_intersect is based on stringwise comparison. WONT WORK
+						/* intervals must match the requirements laid down for ALL idlink-type atts. */
+						
+						/* either way, we need to resort the new collection, as the mergers of local_collection will result in out-of-order. */
+						$new_collection = sort_positionlist($new_collection);
+	//FIXME what other branches need sort_positionlist???
 					}
 				}
 				else
@@ -2026,7 +2176,7 @@ squawk("entering mixed classification/idlink branch");
 					/* we are working on s-atts belonging to the same family, so we know that they all have matching position numbers;
 					 * rather than multiple pipes to cwb-s-decode, let's use CQP to get the different attributes one by one. */
 					$cqp->execute("RestrScan = <$att>[] expand to $att");
-	
+					
 					/* set up the vars we need to run, then interpret, the query tabulation command. */
 					
 					/* the CQP specification of what "fields" (value'd s-atts) we want included as tabulation columns. */
@@ -2056,7 +2206,9 @@ squawk("entering mixed classification/idlink branch");
 					
 					/* new version using raw_execute(); can't use a stream because of the extra columns.  */
 					$tab_cmd = "tabulate RestrScan $tab_cmd_fieldspec, match, matchend";
-squawk("opening raw read of all vals from CQP/tab:");
+					$cqp->raw_execute($tab_cmd);
+// squawk("opening raw read of all vals from CQP/tab:");
+					
 					while (false !== ($l = $cqp->raw_read()))
 					{
 						$arr   = explode("\t", rtrim($l));
@@ -2065,9 +2217,9 @@ squawk("opening raw read of all vals from CQP/tab:");
 //end debug code
 						$end   = (int)array_pop($arr);
 						$begin = (int)array_pop($arr);
-							
+						
 						foreach ($checker as $field => $possibles)
-// 						{
+//						{
 							/* if the value for this field is not any of the possibles, we should not add;
 							 * add only ends up false if one such field was enocuntered, true means every field
 							 * contained one of its possible values. */
@@ -2077,11 +2229,15 @@ squawk("opening raw read of all vals from CQP/tab:");
 								break;
 								//NB -- "DATE" data type will make the above ctext more complex. 
 								/// will have to be switch(datatype) case XX: test this way; cas eYY: test that way.
+								// and perhaps it would be best if the whole thing were encapsualted into a 
+								// an anonymous func: $add = $possible_value($arr[$mapper[$field]]]);
+								// where $possible_value is created from the material above.
+								// OR a class, so we can set / pass in info above.
 // 							}
-// 						}
+//	 					}
 						
 						if ($add)
-							$new_collection[] = [ $begin, $end ];			
+							$new_collection[] = [ $begin, $end ];
 					}
 					
 //############################################################################################################################################
@@ -2117,7 +2273,7 @@ if (false){
 // end of fixme code.
 // FIXED: this was due to an empty first col (which should nto happen but can in errorconditions. 
 // FIX was not to trim off -- only to rtrim. See above. 
-	
+
 								if (!in_array($arr[$mapper[$field]], $arr_of_vals))
 								{
 									$add = false;
@@ -2152,12 +2308,15 @@ if (false){
 			 * 
 			 * Then, the more heavyweight intersect-cpos function runs on what's left.
 			 */ 
-			if (isset($text_filter) && '--text' != $att) /* text can't filter itserlf */
+			if (isset($text_filter) && '--text' != $att) /* text can't filter itself */
 			{
 squawk("entering filter xml ivals by text stream branch; att is $att");
 				$col = open_interval_stream(IntervalStream::OPEN_CPOS_COLLECTION, $new_collection);
 				$new_collection = [];
 				$text_filter->rewind();
+				/* setting irreversible saves RAM as we go (at a cost of time) */
+				$col->set_irreversible(true);
+				$text_filter->set_irreversible(true);
 				
 				/* at start of loop, skip to next interval after the *start* of the present text. */
 				while ( $col->seek_to_cpos($text_filter->b()) )
@@ -2219,15 +2378,15 @@ squawk("entering filter xml ivals by text stream branch; att is $att");
 		/* pre loop initialise... */
 		
 		$new_collection = array();
-				
+		
 		$ix = 0; /* index into current collection */
 		
 		reset($collection); /* just in case */
 		
 		list($a, $b) = current($collection); /* no return test as we know the input array has at least one element. */
 		
-		/* nb: $a      = start of range from incoming colleciton. $b      = end of that range.
-		 *     $this_a = start of range in  existing collection.  $this_b = end of that range.
+		/* nb: $a      = start of range from incoming collection. $b      = end of that range.
+		 *     $this_a = start of range in   existing collection. $this_b = end of that range.
 		 */
 		
 		/* there's a lot of repetition in the if-else tree within this loop, but it serves to make the algorithm clearer. */
@@ -2325,7 +2484,6 @@ squawk("entering filter xml ivals by text stream branch; att is $att");
 		 * <SE adds: No need to – your algorithm is tidy and clear now, and I don't think my alternative would be more efficient.>
 		 */
 	}
-
 	
 	
 	
@@ -2458,71 +2616,119 @@ squawk("entering filter xml ivals by text stream branch; att is $att");
 	 * @param  Restriction $that     The Restriction that is not "this".
 	 * @return QueryScope            Return value has to be a query scope, because 
 	 *                               intersecting two Restrictions could create something 
-	 *                               that is only representable as an anonymous Subcorpus. 
+	 *                               that is only representable as an anonymous Subcorpus.
+	 *                               Temporarily, Boolean false is returned for non-doable intersects. 
 	 */
 	public function get_intersect(Restriction $that)
 	{
-		$type_this = $this->get_item_type();
-		$type_that = $that->get_item_type();
+		/* easy advance check for empty restriction, as the intersct is also then an empty QueryScope. */
+		if (!($that && $this->size_tokens() && $that->size_tokens()))
+			return QueryScope::new_empty();
+
+		$type_this  = $this->get_item_type();
+		$type_that  = $that->get_item_type();
 		$ident_this = $this->get_item_identifier();
 		$ident_that = $that->get_item_identifier();
 		
 		if ($type_this == $type_that)
 		{
-squawk("SAME TYPE");
 			/* two of the same type : Do they also share the same identifier? */
 			
 			if ($ident_this == $ident_that)
 			{
-				/* both based on text OR idlink metadata : we can get an intersection by merging the conditions on the  SQL queries. */
+				if ('@' == $type_this)
+				{
+					//TODO : both REstrictions contain restriction criteria on multiple elements (text + xml, or xml_a + xml_b, or...) 
+					// merge two arbitrary cpos lists. USe istream-lib.
+//FIXME
+goto unbuilt_intersect_exit_point;
+// when fixed, there will be a return here!
+				}
+				
+				/* OK, at this point, it's either ALL text, or ALL one particular idlink.
+				 * Therefore: we can get an intersection by pulling together the conditions - without having to run the actual SQL queries.
+				 *  
+				 * All text: pretty easy as long as we make sure to use --text as the array key. 
+				 * 
+				 * All one idlink: the two restrictions have the same item type and item identifier, but it's not text-based
+				 * or @-based. Therefore - each Restriction is a set of conditions on the same, single ID link. 
+				 * 
+				 * Algorithm: copy parsed-conditions from $this to a new array, then analyse $that to work out what to add / take away.
+				 */
 				
 				if ('text' == $type_this)
+					$pc_key =  '--text';   /* parsed-conditions key */
+				else 
+					$pc_key = $type_this;
+				
+				/* the above variable means we can use the same code for idlinks & text metadata. */
+				/* we begin by setting the "new" parsed conditions on texts to those of the first Restriction */
+				
+				$new = $this->parsed_conditions[$pc_key];
+				
+				/* collect a list of the fields in the 2nd Restriction, so we can check them against the New */
+				$fields_in_that = [];
+				foreach ($that->parsed_conditions[$pc_key] as $cond)
+					list($fields_in_that[]) = explode('~', $cond);
+				$fields_in_that = array_unique($fields_in_that);
+				
+				foreach ($fields_in_that as $f)
 				{
-					$cats1 = explode('.', $this->parsed_conditions['--text'][0]);
-					$cats2 = explode('.', $that->parsed_conditions['--text'][0]);
-					$all = array_unique(array_merge($cats1, $cats2));
-					sort($all);
-					$newinput = '$^--text|' . implode('.', $all);
+					/* for each field in the second Restriction, see if there is a condition on it in New. */
+					$field_is_in_new = false;
+					foreach($new as $k => $new_entry)
+					{
+						if (preg_match("|^$f~|", $new_entry))
+						{
+							$field_is_in_new = true;
+							/* field is conditioned in the first Restriction: so remove from New conds that are not also in second */
+							if (!in_array($new_entry, $that->parsed_conditions[$pc_key]))
+								unset($new[$k]);
+						}
+					}
+					/* if field was not conditioned in New, transfer ALL conditions invovling that field to New */
+					if (!$field_is_in_new)
+						foreach($that->parsed_conditions[$pc_key] as $c)
+							if (preg_match("|^$f~|", $c))
+								$new[] = $c;
 				}
-				else if ('@' == $type_this)
-				{
-					//TODO : merge two arbitrary cpos lists. USe CposCollectionStream.
-//FIXME
-$d="we have been asked to do an intersct with a restriction that can';t be done, returning false";
-show_var($d);
-return false;
-				}
-				else
-				{
-					$cats1 = explode('.', $this->parsed_conditions[$type_this]);
-					$cats2 = explode('.', $this->parsed_conditions[$type_this]);
-					$all = array_unique(array_merge($cats1, $cats2));
-					sort($all);
-					$newinput = "$^$type_this|" . implode('.', $all);   // TODO, this is ctually an anonymous subcorpuas, for which there is not currenlty an allowancve.
-					// create subcorp instead, and then wrap in a scope, and then return?
-				}
+				
+// global $User;if ($User->is_admin()) {var_dump($new , $this->parsed_conditions['--text'], $that->parsed_conditions['--text']);}
+				if (empty($new))
+					/* No texts can match the conditions, so the intersection is an empty QS. */
+					return QueryScope::new_empty();
+				sort($new);
+				$newinput = '$^' . $pc_key . '|' . implode('.', $new);
 			}
 			else
 			{
 				/* same type, but not the same ident. : we therefore have to operate by item list. */
-// FIXME can't remove the "abort" till I have sorted out that get_item_list is working. 	
-//FIXME
-$d="we have been asked to do an intersct with a restriction that can';t be done, returning false";
-show_var($d);
-return false;		
+				
+// FIXME can't remove the "abort" till I have sorted out that get_item_list is working. 
+goto unbuilt_intersect_exit_point;
+// I think get_item_list *is* working now, but TODO it is necessary to make sure that we get back NUMERIC INDEXES not IDs.
+// This won't happen if each R has an item_identifier (but they are not the SAME item identifiers)
+// FIXME ergo, the code below doesn't work. Except if both give us numeric arrays./ 
+
+// ........... bloody ell, do we need to stream both , and check eachx range for being in both $this and $that? Possibly.
+// ........... but if both already are sequence item lists, then they can be intersecterd with array_intersect.  
+// Hmmm, how canm we do this while avoiding overlap with "initialise_cpos_list"?
+// maybe have that ALSO create an item-index cache variable containing the names?
 				$joint = array_intersect($this->get_item_list(), $that->get_item_list());
-				sort($joint, SORT_NUMERIC);
+				if (empty($joint))
+					return QueryScope::new_empty();
+// 				sort($joint, SORT_NUMERIC); --> not needed - get_item_list should sort, and array_intersect will preserve.
 				$newinput = '^' . $type_this . '^^' .  implode(' ' , $joint);
 			}
 			
 			/* whatever happens we have the "new input" string. */
-show_var($newinput);
 			return QueryScope::new_by_unserialise($newinput);
-		}
+		} 
+		/* end if $this and $that have the same item type. All paths in that if return. So ... */
 		
 squawk("2 diff types");
 		
-		/* we are up to here: two different types. */
+		/* ... if we are up to here, we have two different types. */
 		
 		if ('text' == $type_that)
 			/* make life easy: re-call this function with that as subject and this as argument. */
@@ -2534,11 +2740,9 @@ squawk("2 diff types");
 			
 			if ('@' == $type_that)
 			{
-				// TODO filter the intervals by text.		
+				// TODO filter the intervals by text
 //FIXME
-$d="we have been asked to do an intersct with a restriction that can't be done, returning false";
-show_var($d);
-return false;				
+goto unbuilt_intersect_exit_point;
 			}
 			else
 			{
@@ -2552,7 +2756,7 @@ squawk("text and XML element");
 							order by b asc";
 				$txt = open_interval_stream(IntervalStream::OPEN_SQL_SELECT, $sql);
 				
-				if ($ident_that == '')
+				if ('' == $ident_that)
 				{
 					// we're starting from a numeric list. we can get the cpos_collectioon  and the item list, and 
 					// filter the numbers by comparing the ccpos colelction to the text intervasl to decide whetehr or not
@@ -2636,7 +2840,7 @@ squawk("entering loop here");
 				$sc->populate_from_list($type_that, '', $ivals);
 //show_var($sc);
 				
-				/*  wrap the anonymous subcorous into a scope and return */
+				/*  wrap the anonymous subcorpus into a scope and return */
 //$qqq = QueryScope::new_by_wrap_subcorpus($sc);
 //squawk("L:Ast, the QS");show_var($qqq); 
 				return QueryScope::new_by_wrap_subcorpus($sc);
@@ -2648,27 +2852,24 @@ squawk("entering loop here");
 		/* up to here: THIS and THAT are not the same, and neither is 'text'. */
 		
 		if ($type_that == '@')
-			/* do another switcheroo for '@' */ 
+			/* do another switcheroo for '@' */
 			return $that->get_intersect($this);
 		
 		if ($type_this == '@')
 		{
 			/* THIS is arbitrary intervals; THAT is an XML type. */
 //FIXME
-$d="we have been asked to do an intersct with a restriction that can';t be done, returning false";
-show_var($d);
-return false;
+goto unbuilt_intersect_exit_point;
+
 		}
 		
 		
 		/* up to here: THIS and THAT are not the same, and both 'text' and '@' are ruled out for both. */
 
 //FIXME
-$d="we have been asked to do an intersct with a restriction that can';t be done, returning false";
-show_var($d);
-return false;
+goto unbuilt_intersect_exit_point;
 
-// the "return false" is here because I am not sure about the logic below. 
+// FIXME the "return false" is here because I am not sure about the logic below. 
 
 		// run through both XML streams at once,  lookign for overlap */
 		
@@ -2702,7 +2903,7 @@ return false;
 				$test_b = $xml_this->b();
 				$test_e = $xml_this->e();
 			}
-				
+			
 			/* OK, at this point: this_b is not after the current THAT_e; and this_e may or may not be */
 			
 			do
@@ -2711,7 +2912,7 @@ return false;
 				if ($test_b < $xml_that->b())
 					$test_b = $xml_that->b();
 				
-				/* clamp(?), store, then re-test what's left on a new THAT */  
+				/* clamp(?), store, then re-test what's left on a new THAT */
 				if ($test_e >= $xml_that->e())
 				{
 					$result[] = [$test_b, $xml_that->e()];
@@ -2745,11 +2946,18 @@ return false;
 		
 		$result = array_values($result);
 show_var($result);
-//TODO make an anonymous subcorpus --> scope from $result & return it. .
+//TODO make an anonymous subcorpus --> scope from $result & return it. 
+//FIXME no return here. 
 	
-		// that should exhuast all possbilities. 
+		// that should exhaust all possbilities. 
 
 		assert(false, "should not be reachable - either they are the same, or they are differenct.");
+		
+		// Only exists till all are covered. 
+unbuilt_intersect_exit_point:
+		$d="Restriction been asked to calculate a type of intersect that can't be done; R::get_intersect returns false";
+		show_var($d);
+		return false;
 	}
 	
 	
@@ -2777,13 +2985,17 @@ show_var($result);
 	 * Gets an alternative encoding for the Restriction that can be put into a link.
 	 * (There will be no ampersand at the beginning or end of the string.)
 	 * 
-	 * This is, in effect, the "undo" function for new_from_url. 
+	 * This is, in effect, the "undo" function for new_from_url.
+	 * 
+	 * @return string      Or, NULL if this is an empty Restriction. 
 	 */
 	public function url_serialise()
 	{
-		/* quick short circuit.... */
+		/* quick short circuits.... */
 		if (empty($this->serialised))
-			return 'del=begin&del=end';
+			return 'del=begin&del=end'; /* whole corpus */
+		if (0 == $this->size_tokens())
+			return NULL;
 		
 		/*
 		 * We map from internal data structure format into a URL string.
@@ -2804,7 +3016,7 @@ show_var($result);
 		
 		return  $urlbit;
 	}
-
+	
 	
 	/**
 	 * Integer values of size in tokens.
@@ -2820,6 +3032,7 @@ show_var($result);
 	 */
 	public function size_items(&$item = NULL)
 	{
+		//TODO in 3.3: get rid of out param
 		$item = $this->item_type;
 		return $this->n_items;
 	}
@@ -2830,6 +3043,7 @@ show_var($result);
 	 */
 	public function size_ids(&$item_identifier = NULL)
 	{
+		//TODO in 3.3: get rid of out param
 		$item_identifier = $this->item_identifier;
 		return $this->n_ids;//TODO
 	}
@@ -2859,15 +3073,27 @@ show_var($result);
 		}
 		else if (!empty($this->item_identifier))
 		{
+			$idlink_satt = "{$this->item_type}_{$this->item_identifier}";
 			$this->initialise_idlink_where();
-			$where = implode(" && ", $category_filters) . ' && ' . $this->stored_idlink_where; 
+			$where = implode(" && ", $category_filters) . ' && ' . $this->stored_idlink_where[$idlink_satt]; 
 			
-			$tbl = get_idlink_table_name($this->corpus, "{$this->item_type}_{$this->item_identifier}");
+			$tbl = get_idlink_table_name($this->corpus, $idlink_satt);
 			
 			return mysqli_fetch_row(do_sql_query("select sum(n_tokens), sum(n_items), count(*) from `$tbl` where $where")) ; 
 		}
 		else 
 			return false;
+	}
+// TODO the abovelooks as if it is now unused, should this code be elsewhere. ??
+	
+	
+	/**
+	 * Size in ids as printable string.
+	 */
+	public function print_size_ids()
+	{
+		// FIXME
+return "{$this->n_ids}";
 	}
 
 	
@@ -2877,10 +3103,10 @@ show_var($result);
 	public function print_size_items()
 	{
 		if ($this->item_type == '@')
-			return number_format($this->n_items) . ' corpus segment' . ($this->n_items > 1 ? 's' : '');
+			return number_format($this->n_items) . ' corpus segment' . ($this->n_items != 1 ? 's' : '');
 		
 		else if ($this->item_type == 'text')
-			return number_format($this->n_items) . ' text' . ($this->n_items > 1 ? 's' : '');
+			return number_format($this->n_items) . ' text' . ($this->n_items != 1 ? 's' : '');
 		
 		else 
 		{
@@ -2890,9 +3116,9 @@ show_var($result);
 			if (!empty($this->item_identifier))
 			{
 				$info_idatt =  get_xml_info($this->corpus, $this->item_type.'_'.$this->item_identifier);
-				$extra = ' (' . number_format($this->n_ids) . escape_html($info_idatt->description) .  ($this->n_ids > 1 ? 's' : '') . ')';
+				$extra = ' (' . number_format($this->n_ids) . ' ' . escape_html($info_idatt->description) .  ($this->n_ids != 1 ? 's' : '') . ')';
 			}
-			return number_format($this->n_items) . ' ' . escape_html($info->description) . ' unit' . ($this->n_items > 1 ? 's' : '') . $extra;
+			return number_format($this->n_items) . ' ' . escape_html($info->description) . ' unit' . ($this->n_items != 1 ? 's' : '') . $extra;
 		}
 	}
 	
@@ -2902,12 +3128,28 @@ show_var($result);
 	}
 	
 	
-	
+	/**
+	 * Gets the Restriction's item type: that is, the s-attribute "family"
+	 * for the units the Restriction consists of. The special value "@" is
+	 * returned if the units are not complete XML regions of any type.
+	 * 
+	 * @return string   Item type of the Restriction.
+	 */
 	public function get_item_type()
 	{
 		return $this->item_type;
 	}
 	
+	/**
+	 * Gets the Restriction's item identifier: the s-attribute name, 
+	 * minus "family", of the valued attribute of type ID-link. 
+	 * So, for instance,  if utterance (u) speakers are identified by the "who"
+	 * attribute, then this function returns "who" (and get_item_type() returns "u").
+	 * 
+	 * @return string   This string will be empty if there is no item identifier
+	 *                  (i.e. if the Restriction is not a whole set of texts or 
+	 *                  a whole set of items specified via idlink). 
+	 */
 	public function get_item_identifier()
 	{
 		return $this->item_identifier;
@@ -2932,49 +3174,67 @@ show_var($result);
 	 * @param string $item_identifier  Out parameter: if present, set to the item identifier or to "".
 	 * @return array                   Sorted list (or, false). See description.
 	 */
-	public function get_item_list(&$item_type = NULL, &$item_identifier = NULL)
+	public function get_item_list()
 	{
-		if ($this->item_type == 'text')
-		{
-			/* consists of a whole number of complete texts (selected by metadata) */
-			$item_type = 'text'; 
-			$item_identifier = 'id';
-
-			$this->initialise_text_metadata_where();
-			
-			return list_sql_values("select text_id from text_metadata_for_{$this->corpus} 
-											where {$this->stored_text_metadata_where} order by text_id asc");
-			
-// 			$list = array();
-// 			while ($r = mysqli_fetch_row($result))
-// 				$list[] = $r[0];
-// 			return $list;
-		}
-		else if ($this->item_type == '@')
+		if ($this->item_type == '@')
 		{
 			/* consists of an arbitrary set of cpos ranges. */
-			$item_type = '@';
-			$item_identifier = '';
-			return false;
+//FIXME, this will be neeeded at some point
+$d = "The item list for this type of restriction can't be returned (yet)";
+show_var($d);
+return false;
 		}
-		else
+		else if ($this->item_type == 'text')
+		{
+			/* consists of a whole number of complete texts (selected by metadata) */
+			$this->initialise_text_metadata_where();			
+			return list_sql_values("select text_id from text_metadata_for_{$this->corpus} 
+											where {$this->stored_text_metadata_where} order by text_id asc");
+		}
+		else 
 		{
 			/* consists of a whole number of ranges of some s-attribute */
-			$item_type = $this->item_type; 
-			$item_identifier = $this->item_identifier;
-			
 			if ('' != $this->item_identifier)
 			{
+				/* it's idlink based */
 				$this->initialise_idlink_where();
 				$att = "{$this->item_type}_{$this->item_identifier}";
 				$tbl = get_idlink_table_name($this->corpus, $att);
-				return list_sql_values("select __ID from `$tbl` where {$this->stored_idlink_where[$att]} order by __ID asc");
+				return list_sql_values("select `__ID` from `$tbl` where {$this->stored_idlink_where[$att]} order by `__ID` asc");
 			}
-			
-			return false;
-			// TODO see note from above:
-		    // TODO: what do we want in this case? list of articles? list of utterances? list of cpos pairs? 
-		    // An idlink if there is one? a uniquid if there is one?
+			else
+			{
+				/* it isn't idlink based. Or, it's based on multiple idlinks. */
+//FIXME, this is now needed at some point
+$d = "The item list for this type of restriction can't be returned (yet)";
+show_var($d);
+return false;
+
+// hmm, should ther be a "setup range-index item_list" function here?
+				$ivals = [];
+				$seq = 0;
+				$check_stream = [];
+				// TODO see note from above: we need ot return the sequence numbers of the ranges that are within the restriction.
+				// Compile array of conditions. 
+				// Open a stream for each valued s-att that we need.
+				while (1)
+				{
+					// advance all streams and increment seq.
+					foreach($check_stream as $cs)
+					{
+						// advance CS
+					}
+					++$seq;
+					// if all conditions are met, add to ivals
+					foreach($array_of_conditions as $cond)
+					{
+						// if the condition is met,l do nohthing,. 
+						// if colnd is not met, continue (so this region never gets added to ivals);
+					}
+					$ivals[] = $seq;
+				}
+				return $ivals;
+			}
 		}
 	}
 	
@@ -2988,65 +3248,64 @@ show_var($result);
 	/*
 	 * frequency table functions
 	 * 
-	 * HAVE NOT BEEN THOUGHT THROUGH AT ALL. 
-	 * 
-	 * Largely a copy of the Subcorpus functions, then QueryScope can delegate. The setup func is different. 
+	 * Largely a copy of the Subcorpus functions, so that QueryScope can delegate. The setup func is different. 
 	 * 
 	 */
+	
 	/**
 	 * Checks whether a frequency table for the part of the corpus represented by the Restriction exists in cache.
 	 * 
-	 * @return bool  True iff the Restriction has a frequency table.
+	 * @param  bool  $force_check   If true, the freqtable record will be re-checked in the database.
+	 * @return bool                 True iff the Restriction has a frequency table.
 	 */	
-	public function has_freqtable()
+	public function has_freqtable($force_check = false)
 	{
-		/* no need to refresh, so only call setup if this is the first time. */
-		if (is_null($this->freqtable_record))
-			$this->setup_freqtable_record();
+		if ($force_check)
+			$this->freqtable_record = NULL;
+		
+		/* Other than the above. */
+		$this->setup_freqtable_record();
 		return (false !== $this->freqtable_record);
 	}
+	
 	public function get_freqtable_record()
 	{
 		if ($this->has_freqtable())
 			return $this->freqtable_record;
 		else
-			return false;
+			return NULL;
 	}
+
 	public function get_freqtable_base()
 	{
-		if (is_null($this->freqtable_record))
-			$this->setup_freqtable_record();
+		$this->setup_freqtable_record(); 
 		return $this->freqtable_record->freqtable_name;
 	}
+	
 	private function setup_freqtable_record()
 	{
+		if (is_object($this->freqtable_record))
+			return true;
+		
 		/* (A) look for a freq table for this Restriction */
-		$sql = "select * from saved_freqtables where corpus = '{$this->corpus}' and query_scope = '{$this->serialised}'";
+		$sql = "select * from `saved_freqtables` where `corpus` = '{$this->corpus}' and `query_scope` = '{$this->serialised}'";
 		$result = do_sql_query($sql);
 		
 		if (0 < mysqli_num_rows($result))
-		{
-			$this->freqtable_record = mysqli_fetch_object($result);
-			return true;
-		}
+			return (bool)($this->freqtable_record = mysqli_fetch_object($result));
 		
 		/* (B) look for a freq table for a Subcorpus whose content matches this Restriction, i.e. whose freq list was based on these restrictions */
 		$sql = "select * from saved_subcorpora 
-			where corpus = '{$this->corpus}' 
-			and content = '{$this->serialised}' 
-			and name !='--last_restrictions'"; /* because we know that Last Restrictions don't have freq lists. */
+					where `corpus`   = '{$this->corpus}' 
+					and   `content`  = '{$this->serialised}' 
+					and   `name`    != '--last_restrictions'"; /* because we know that Last Restrictions don't have freq lists. */
 		$result = do_sql_query($sql);
 		
 		while ($sc = Subcorpus::new_from_db_result($result))
-		{
 			if ($sc->has_freqtable())
-			{
-				$this->freqtable_record = $sc->get_freqtable_record();
-				return true;
-			}
-		}
-		$this->freqtable_record = false;
-		return true;
+				return (bool)($this->freqtable_record = $sc->get_freqtable_record());
+
+		return ($this->freqtable_record = false);
 	}
 	
 	
@@ -3084,6 +3343,9 @@ show_var($result);
 
 		$cqp = get_global_cqp();
 		
+// 		TODO
+// 		$cqp->undump('Curr-Restriction', $this->cpos_collection)
+		
 		$dumpfile = "{$Config->dir->cache}/restr_dump_{$Config->instance_name}"; 
 		$this->create_dumpfile($dumpfile);
 
@@ -3097,7 +3359,7 @@ show_var($result);
 	/**
 	 * Creates a CQP dumpfile representing this Restriction at the specified location.
 	 * 
-	 * Returns the number of rows in the dumpfile.
+	 * Returns the number of rows in the dumpfile. // poss bug: no it doesn't.
 	 * 
 	 * @param string $path
 	 */
@@ -3108,12 +3370,14 @@ show_var($result);
 		$buf = NULL;
 		/* the use of a buffer object allows us to merge adjacent ranges. */ 
 
+		//TODO if this is idlink with sql-able conditions - do as with text meta. 
+		
 		if ($this->item_type == 'text')
 		{
 			/* rely on the SQL of the metadata table */
 			$this->initialise_text_metadata_where();
 
-			$sql = "SELECT cqp_begin, cqp_end FROM text_metadata_for_{$this->corpus} WHERE {$this->stored_text_metadata_where} ORDER BY cqp_begin ASC";
+			$sql = "SELECT cqp_begin, cqp_end FROM `text_metadata_for_{$this->corpus}` WHERE {$this->stored_text_metadata_where} ORDER BY cqp_begin ASC";
 			$result = do_sql_query($sql);
 			
 			/* stream to disk w/ buffering for merger of adjacent pairs. */
@@ -3138,8 +3402,7 @@ show_var($result);
 		}
 		else
 		{
-			if (!$this->hasrun_initialise_cpos_collection)
-				$this->initialise_cpos_collection();
+			$this->initialise_cpos_collection();
 			
 			/* stream to disk w/ buffering for merger of adjacent pairs. */
 			reset($this->cpos_collection);
@@ -3165,7 +3428,6 @@ show_var($result);
 		
 		fclose($dest);
 	}
-
 	
 	
 	
@@ -3292,7 +3554,7 @@ show_var($result);
 
 }
 /*
- * ======================== 
+ * ========================
  * end of class Restriction
  * ========================
  */
@@ -3346,7 +3608,7 @@ class Subcorpus
 	 * ===============
 	 */
 	
-	/**	The integer ID of a saved subcorpus. If the object has not had a DB subcorpus loaded into it, then this will be NULL. */
+	/** The integer ID of a saved subcorpus. If the object has not had a DB subcorpus loaded into it, then this will be NULL. */
 	public $id = NULL;
 	
 	/** The name that the user gave to this subcorpus: 200 character handle string. */
@@ -3414,7 +3676,7 @@ class Subcorpus
 	
 	/** Items as keys in this array, for quicker in_array() style lookup. */
 	private $fast_item_list_lookup_hash;
-
+	
 	
 	/*
 	 * =============
@@ -3454,8 +3716,8 @@ class Subcorpus
 		
 		$obj->corpus = cqpweb_handle_enforce($corpus, HANDLE_MAX_CORPUS);
 		
-		if ('' != $name)
-			$obj->user   = cqpweb_handle_enforce($name, HANDLE_MAX_USERNAME);
+		if ('' != $user)
+			$obj->user   = cqpweb_handle_enforce($user, HANDLE_MAX_USERNAME);
 		else 
 			$obj->user   = '';
 		
@@ -3463,6 +3725,24 @@ class Subcorpus
 		
 		return $obj;
 	}
+	
+	
+	/**
+	 * Make-it-easy wrapper for the process of creating an anonymous subcorpus. 
+	 */
+	public static function create_anon($corpus = NULL)
+	{
+		if (empty($corpus))
+		{
+			global $Corpus;
+			$corpus = $Corpus->name;
+		}
+		
+		return self::create('', $corpus, '');
+		
+	}
+	
+	
 	
 // 	/**
 // 	 * Creates and populates a special last-restrictions subcorpus.
@@ -3495,9 +3775,9 @@ class Subcorpus
 	 * 
 	 * The returned SC has been committed to the DB and is ready to roll. 
 	 * 
-	 * @param Subcorpus $source   The source of the duplication. 
-	 * @param string    $newname  New subcorpus save-name (handle)
-	 * @return Subcorpus          Record of the new subcorpus.     
+	 * @param  Subcorpus $source   The source of the duplication. 
+	 * @param  string    $newname  New subcorpus save-name (handle)
+	 * @return Subcorpus           Record of the new subcorpus.
 	 */
 	public static function duplicate($source, $newname)
 	{
@@ -3579,7 +3859,7 @@ class Subcorpus
 	{
 		$id = (int) $id;
 		$result = do_sql_query("select * from saved_subcorpora where id = $id");
-
+		
 		if (0 == mysqli_num_rows($result))
 			return false;
 		
@@ -3593,7 +3873,7 @@ class Subcorpus
 		$user   = escape_sql($user);
 		
 		$result = do_sql_query("select * from saved_subcorpora where corpus='$corpus' and user='$user' and name='$name'");
-
+		
 		if (0 == mysqli_num_rows($result))
 			return false;
 		
@@ -3608,7 +3888,7 @@ class Subcorpus
 			$fields_present = array();
 			foreach (mysqli_fetch_fields($result) as $fo)
 				$fields_present[] = $fo->name;
-
+			
 			$diff = array_diff(self::$DATABASE_FIELD_NAMES, $fields_present);
 			
 			if (!empty($diff))
@@ -3637,7 +3917,7 @@ class Subcorpus
 		 * 
 		 * We ALSO assume that there is at least one result in the result set argument.
 		 */
-
+		
 		$this->id = $o->id;
 		
 		$this->name   = $o->name;
@@ -3647,7 +3927,7 @@ class Subcorpus
 		/* n_ids is set during parse */
 		$this->n_items  = $o->n_items;
 		$this->n_tokens = $o->n_tokens;
-
+		
 		$this->content  = $o->content;
 		/*
 		 * The following variables get parsed out from content :
@@ -3682,7 +3962,7 @@ class Subcorpus
 			/* if the identifier is stated, then it is an idlink, and the list is of IDs */
 			if ('' != $this->item_identifier && 'text' != $this->item_type)
 				$this->n_ids = count($this->item_list);
-			// this will not actually weork. COS ite4m_list was sized off that list. Consider:
+			// this will not actually weork. COS item_list was sized off that list. Consider:
 // | 18281 |       1 | ^u^who^3H6_Clifford                                                                                                                                                                                      |
 // | 18282 |      42 | ^u^who^3H6_1Keeper 3H6_1Messenger 3H6_1Watchman 3H6_2Keeper 3H6_2Messenger ...
 // | 19080 |       1 | ^u^who^1H6_Margaret                                                                                                                                                                                      |
@@ -3751,7 +4031,7 @@ class Subcorpus
 	 * 
 	 * All return true or false if error as detected.
 	 */
-
+	
 	
 	
 	/**
@@ -3772,10 +4052,10 @@ class Subcorpus
 	 * If $check is true the list will be validated for handle status. By default it is false:
 	 * we assume the caller has assembled the array in $item_list from a known-safe source.
 	 * 
-	 * @param  string   $item_type          
-	 * @param  string   $item_identifier
-	 * @param  array    $item_list
-	 * @param  bool     $check
+	 * @param  string   $item_type        Type of item on the list (e.g. "text").
+	 * @param  string   $item_identifier  The identifier of the items on the list (e.g. "id"); "" for sequence numbers.
+	 * @param  array    $item_list        List of items (flat array). 
+	 * @param  bool     $check            If true, items on the list will be checked to see if they are handles. 
 	 * @return bool
 	 */
 	public function populate_from_list($item_type, $item_identifier, $item_list, $check = false)
@@ -3817,7 +4097,7 @@ class Subcorpus
 // for now the code is just repeated with minor variants, fret abnout this later, let's just get the damn thing working.
 // END OF THE TODO.
 //
-//TODO if "populate from list" is being done based on restriction intersect,t hat's even more inefficient. */
+//TODO if "populate from list" is being done based on restriction intersect, that's even more inefficient. */
 //
 //
 			/* calculate n tokens for a subcorpus of xml units.... */
@@ -3865,17 +4145,17 @@ class Subcorpus
 	public function populate_from_query_texts($qname)
 	{
 		$cqp = get_global_cqp();
-
+		
 		/* get text list from query result */
 		$grouplist = $cqp->execute("group $qname match text_id");
-
+		
 		if (!$grouplist)
 			return false;
-	
+		
 		$texts = array();
 		foreach($grouplist as $g)
 			list($texts[]) = explode("\t", $g);
-
+		
 		/* this then collapses to the procedure for text list... */
 		return $this->populate_from_list('text', 'id', $texts);
 	}
@@ -3894,7 +4174,7 @@ class Subcorpus
 	{
 		if (!xml_exists($att, $this->corpus))
 			return false;
-
+		
 		$cqp = get_global_cqp();
 		
 		/* get region cpos list from query result */
@@ -3934,7 +4214,7 @@ class Subcorpus
 		$seqpos_list = array();
 		$seq = 0;
 
-		/* it's necessary to scroll through the whole s-attribute, because some of the query hits may not be            
+		/* it's necessary to scroll through the whole s-attribute, because some of the query hits may not be
 		 * within a region of the specified type; and, to get the sequence numbers of the regions which are included. 
 		 * If so, their unexpanded result remains part of the dump...
 		 */
@@ -3945,7 +4225,7 @@ class Subcorpus
 // 			list($begin, $end) = explode("\t", trim($l));
 // 			$key = "$begin-$end";
 			$key = trim($l);
-
+			
 			if (isset($index[$key]))
 			{
 				$seqpos_list[] = $seq;
@@ -3982,9 +4262,9 @@ class Subcorpus
 		if ($source_sc->corpus != $this->corpus)
 			exiterror("Subcorpus building error: you cannot move subcorpus data from one corpus to another!");
 		
-		$item_type = NULL;
-		$item_identifier = NULL;
-		$texts_to_exclude = $source_sc->get_item_list($item_type, $item_identifier);
+		$item_type        = $source_sc->get_item_type();
+		$item_identifier  = $source_sc->get_item_identifier();
+		$items_to_exclude = $source_sc->get_item_list();
 		
 		if ( $item_type != 'text' || $item_identifier != 'id' )
 			return false;
@@ -3992,20 +4272,21 @@ class Subcorpus
 			/* difficult style: we have to invert either by regions, or by cpos pair. */
 			// get the regions from $source_sc, and invert on that basis.
 			// TODO
+			// could we now invert by other identifiers?
 // 		}
 		else
 		{
 			/* easy style: the subcorpus consists just of texts known by their ID */
 			$result = do_sql_query("select text_id from text_metadata_for_" . $this->corpus);
 			
-			$texts_for_new = array();
+			$items_for_new = array();
 			
 			while ($r = mysqli_fetch_row($result))
-				if (!in_array($r[0], $texts_to_exclude))
-					$texts_for_new[] = $r[0];
+				if (!in_array($r[0], $items_to_exclude))
+					$items_for_new[] = $r[0];
 			
 			/* so then it just collapses to... */
-			return $this->populate_from_list($item_type, $item_identifier, $texts_for_new);
+			return $this->populate_from_list($item_type, $item_identifier, $items_for_new);
 		}
 	}
 	
@@ -4054,81 +4335,37 @@ class Subcorpus
 	
 	
 	
-
+	
 	/**
-	 * Returns an array containing the Ids (or sequence positions) of the items in this Subcorpus. 
-	 * 
-	 * The parameters are out-parameters: the first for the type of item this subcorpus contains,
-	 * the second for the element containing its identifier. If the first is empty, then this SC is not
-	 * a set of complete items. If the second is empty, then it is a set of complete items, BUT
-	 * the items are specified by sequence position on the s-attribute, not by IDs, because we don't
-	 * have a handy s-attribute of datatype UNIQUE_ID. 
+	 * Returns an array containing the IDs (or sequence positions) of the items in this Subcorpus. 
 	 * 
 	 * If this is the kind of subcorpus that can't produce an item list, e.g. it contains arbitrary
-	 * segments or a restriciton based on more than one kind of xml, it sets the out parameters to 
-	 * empty strings, and returns false. 
+	 * segments or a restriction based on more than one kind of xml, it returns false. 
 	 * 
-	 * If this is an unpopulated subcorpus, then it will return false, and will not set the out params.
+	 * If this is an unpopulated subcorpus, then it will return false.
 	 */
-	public function get_item_list(&$item = NULL, &$identifier = NULL)
+	public function get_item_list()
 	{
 		switch($this->mode)
 		{
 		case self::MODE_NOT_POPULATED:
-			return false;
-			
 		case self::MODE_ARBITRARY:
-			$item = '';
-			$identifier = '';
 			return false;
 			
 		case self::MODE_RESTRICTION:
-			/* the more-than-slightly tricky case! */
+			/* is this is an @ Restriction or a $ Restriction? The former doesn't permit 
+			 * an item list. The latter does, and will have a non-"@" item type. */ 
 			$this->assure_restriction();
-
-			// find out if this is an @ Restriction or a $ restriction. if it's an @ R, return false. 
-			// if it's an $ then find out the unit and the identifier and get the list. 
-			//TODO this will ahve to wait alas!!!!
-			$check_item = $check_identifier = NULL;
-			$list = $this->restriction->get_item_list($check_item, $check_identifier);
-			if (false !== $list)
-			{
-				if ($check_item == 'text' && $check_identifier == 'id')
-				{
-					// right now , always true.
-					$item = 'text';
-					$identifier = 'id';
-					
-					return $list;
-				}
-				else 
-					exiterror("CRITICAL LOGIC BUG BAD OUT-PARAMETERS FROM RESTRICTION GET ITEM LIST");
-				// currently: not reached. 
-				//TODO: fix the above
-				//
-				//
-				//
-				
-					
-			}
-			else
-			{
-				/* R::get_item_list *currently* returns false for any case other than a list of texts 
-				 * to which we react by turning it into an arbitrary-style list. */
-				$item = '';
-				$identifier = '';
+			if ('@' == $this->restriction->get_item_type())
 				return false;
-			}
-			/* not reached. */ 
-			break;
+			else
+				return $this->restriction->get_item_list();
 			
 		case self::MODE_LIST:
-			$item = $this->item_type;
-			$identifier = $this->item_identifier;
 			return $this->item_list;
-			
 		}
 		/* not reached: all switch paths lead to return. */
+		return false;
 	}
 
 
@@ -4144,7 +4381,7 @@ class Subcorpus
 		if (is_null($this->fast_item_list_lookup_enabled))
 		{
 			/* if there's nothing in the item list, leave this value as NULL
-			 * (it may not have been set up )  */
+			 * (it may not have been set up)  */
 			if (empty($this->item_list))
 				return false;
 
@@ -4155,13 +4392,11 @@ class Subcorpus
 				$this->fast_item_list_lookup_hash = array();
 				foreach ($this->item_list as $i)
 					$this->fast_item_list_lookup_hash[$i] = true;
-				// TODO there might well be an internal PHP func that will do this faster.
 				$this->fast_item_list_lookup_enabled = true;
 			}
 			else
 				$this->fast_item_list_lookup_enabled = false;
 		}
-		
 		return $this->fast_item_list_lookup_enabled;
 	}
 	
@@ -4209,8 +4444,8 @@ class Subcorpus
 	 */
 	public function size_items(&$item = NULL)
 	{
+		//TODO in 3.3 remove the out-param. 
 		$item = $this->item_type;
-		//TODO remove the out-param. 
 		return $this->n_items;
 	}
 	
@@ -4237,7 +4472,7 @@ class Subcorpus
 		case self::MODE_NOT_POPULATED:
 		case self::MODE_ARBITRARY:
 			return false;
-		
+			
 		case self::MODE_RESTRICTION:
 			/* delegate to Restriction */
 			$this->assure_restriction();
@@ -4262,6 +4497,69 @@ class Subcorpus
 		return false;
 	}
 	
+	
+	// newly written replacement for the funciton below declared "super sketchy"
+	/**
+	 * Gets a QueryScope representing the part of this subcorpus that 
+	 * intersects with a supplied restriction. 
+	 * 
+	 * @param Restriction $restriction
+	 */
+	public function get_intersect_with_restriction($restriction)
+	{
+// 		nb, the FIXME bits in this func are actually "notr written yet"
+		switch($this->mode)
+		{
+		case self::MODE_NOT_POPULATED:
+			return QueryScope::new_empty();
+			
+		case self::MODE_ARBITRARY:
+			//FIXME:
+			
+// 			Create an anonymous subcorpus
+// 			Add to it only the ranges that are in the restriction. 
+			
+			return false; #temp
+			
+		case self::MODE_RESTRICTION:
+			/* delegate to Restriction */
+			$this->assure_restriction();
+			return $this->restriction->get_intersect($restriction);
+			
+		case self::MODE_LIST:
+			/* does the restriction match our item type / item identfier? */
+			if ($restriction->get_item_type() == $this->item_type )
+			{
+				$anon_item_type = $this->item_type;
+				if ($restriction->get_item_identifier() == $this->item_identifier)
+				{
+					/* both match - get its item list, intersect, and return anonymous SC in QS */
+					$anon_item_identifier = $this->item_identifier;
+					$anon_item_list = array_intersect($this->get_item_list(), $restriction->get_item_list());
+					$anon = Subcorpus::create_anon($this->corpus);
+					$anon->populate_from_list($anon_item_type, $anon_item_identifier, $anon_item_list);
+					return QueryScope::new_by_wrap_subcorpus($anon);
+				}
+				else
+				{
+					/* same type of item, but different identifiers. */
+					// TODO: degrade both to a numeric list of items. 
+					// do an array intersect, then sort 
+					// create/return 
+					$anon_item_identifier = '';
+					// FIXME
+					return false; #temp
+				}
+
+			}
+			else
+			{
+				/* not the same item type. So, we need to "degrade" both to cpos, then take the intersect. */
+				return false; #TEMP
+			}
+		}
+		/* end switch */	
+	}
 // 
 // 
 // 
@@ -4274,7 +4572,7 @@ class Subcorpus
  * horrible horrible function
  * @param Restriction $restriction
  */
-	public function get_intersect_with_restriction($restriction)
+	public function get_intersect_with_restriction_old($restriction)
 	{
 		if ($this->mode != self::MODE_RESTRICTION)
 			return false;
@@ -4292,6 +4590,22 @@ class Subcorpus
 //show_var($cats1);
 //show_var($cats2);
 			$all = array_unique(array_merge($cats1, $cats2));
+			// FIX ME - this needds to apply boolean AND instead of OR 
+// actuaklly, it's totally broke nI think .... if we have conditions on multiple columns how does this work? 
+// Why should we assume that intersecting CONDITIONS like this gives the same result as intersecting TEXTS would?
+// just intersecting the options eg 
+/*
+(asex=m OR asex =f ) AND (media=book)      -> yields a set of textgs
+(asex=m) AND (media=book OR media=mag)     -> yields anothere sety of texts 
+What is the intersect?
+By intuition, we knoq it must be 
+(asex=m) AND (media=book)
+
+
+
+*/
+			if (empty($all))
+				return QueryScope::new_empty();
 			sort($all);
 //show_var($all);
 			$newinput = '$^--text|' . implode('.', $all);
@@ -4305,6 +4619,16 @@ class Subcorpus
 	
 	
 	
+	
+	/**
+	 * Gets printable string spelling out the size of the subcorpus in units of "ids" (distinct ID-linked values).
+	 */
+	public function print_size_ids()
+	{
+		// FIXME
+return "{$this->n_ids}";
+	}
+
 	
 	/**
 	 * Gets printable string spelling out the size of the subcorpus in units of "items" (texts, etc.)
@@ -4348,18 +4672,23 @@ class Subcorpus
 	 * ===========================================
 	 * Functions bearing on the freqtable for this
 	 * ===========================================
-	 */	
+	 */
 	
 	
 	
 	/**
 	 * Returns true if this subcorpus has a freqtable already there. Otherwise, false.
+	 * 
+	 * @param  bool  $force_check   If true, the freqtable record will be re-checked in the database.
+	 * @return bool 
 	 */
-	public function has_freqtable()
+	public function has_freqtable($force_check = false)
 	{
-		/* no need to refresh, so only call setup if this is the first time. */
-		if (is_null($this->freqtable_record))
-			$this->setup_freqtable_record();
+		if ($force_check)
+			$this->freqtable_record = NULL;
+		
+		/* Other than the above. */
+		$this->setup_freqtable_record();
 		return (false !== $this->freqtable_record);
 	}
 	
@@ -4372,24 +4701,24 @@ class Subcorpus
 	}
 	
 	/**
-	 * Gets the base-section of the name of the SQL tables cotnaining the frequency list; false if they don't exist.
+	 * Gets the base-section of the name of the SQL tables containing the frequency list; false if they don't exist.
 	 */
 	public function get_freqtable_base()
 	{
-		if (is_null($this->freqtable_record))
-			$this->setup_freqtable_record();
+		$this->setup_freqtable_record();
 		return $this->freqtable_record ? $this->freqtable_record->freqtable_name : false;
 	}
 	
 	/**
-	 * Temp func. May get rid of later. But, lotsa places currently expect an assoc array. 
+	 * Get the database object representing the frequency table for this subcorpus;
+	 * returns NULL if there is no such record.  
 	 */
 	public function get_freqtable_record()
 	{
 		if ($this->has_freqtable())
 			return $this->freqtable_record;
 		else
-			return false;
+			return NULL;
 	}
 	
 	
@@ -4398,13 +4727,16 @@ class Subcorpus
 	 */
 	private function setup_freqtable_record()
 	{
+		if (is_object($this->freqtable_record))
+			return true;
+		
 		/* We check for a freqtable that has this subcorpus's ID number as its scope */
-		$sql = "select * from saved_freqtables where query_scope = '{$this->id}'";
-		$result = do_sql_query($sql);
+		$result = do_sql_query("select * from saved_freqtables where query_scope = '{$this->id}'");
 		if (0 < mysqli_num_rows($result))
 			$this->freqtable_record = mysqli_fetch_object($result);
 		else
-			$this->freqtable_record = false;
+			return ($this->freqtable_record = false);
+		//TODO, use actual FreqtableRecord object here? yteah should do, but postponme that to 3.3
 		
 		return true;
 	}
@@ -4448,7 +4780,7 @@ class Subcorpus
 		/* When there is a dumpfile associated with an SC, delete it from disk. */
 		if (file_exists($path = $this->generate_dumpfile_path()))
 			unlink($path);
-
+		
 		/* if this subcorpus has a compiled freq table, delete it */
 		if ($this->has_freqtable())
 			delete_freqtable($this->freqtable_record->freqtable_name);
@@ -4505,9 +4837,9 @@ class Subcorpus
 		 * out its cpos collection to file -- then that's our data, and we are in arbitrary mode.
 		 */
 		
-		$check_type = $check_identifier = NULL;
-		
-		$this->item_list = $this->restriction->get_item_list($check_type, $check_identifier);
+		$check_type = $this->restriction->get_item_type();
+		$check_identifier = $this->restriction->get_item_identifier();
+		$this->item_list = $this->restriction->get_item_list();
 		
 		if (!$this->item_list)
 		{
@@ -4538,7 +4870,7 @@ class Subcorpus
 		$this->restriction = NULL;
 		$this->update_content();
 		
-		/* and that's all: we are now downgraded from Restriction to List or Arbitrary,.  */
+		/* and that's all: we are now downgraded from Restriction to List or Arbitrary.  */
 	}
 	
 	
@@ -4627,17 +4959,17 @@ class Subcorpus
 		if (is_null($this->id))
 		{
 			/* this SC does not exist in the DB: insert */
-
+			
 			/* before insert, delete any pre-existing SC. */
 			$this->delete_sc_with_same_name();
-
+			
 			do_sql_query(
 				"INSERT INTO saved_subcorpora 
 					(name,          corpus,            user,            content,            n_items,          n_tokens)
 							values 
 					('$this->name', '{$this->corpus}', '{$this->user}', '{$this->content}', {$this->n_items}, {$this->n_tokens})"
 				);
-
+			
 			$this->id = get_sql_insert_id();
 		}
 		else
@@ -4656,8 +4988,8 @@ class Subcorpus
 		}
 		return true;
 	}
-
-
+	
+	
 	/**
 	 * Ancillary func for save: deletes an existing saved SC where the name/corpus/user match.
 	 * 
@@ -4670,17 +5002,17 @@ class Subcorpus
 		else
 			return false;
 	}
-
+	
 	/**
 	 * Delete the subcorpus from the database. Returns true for success, false for failure.
 	 */
 	public function delete()
 	{
 		$this->wipe_dependent_data();
-
+		
 		/* and finally, get rid of the actual entry in the subcorpus table. */
 		do_sql_query('delete from saved_subcorpora where id = ' . $this->id);
-
+		
 		return true;
 	}
 	
@@ -4720,7 +5052,7 @@ class Subcorpus
 	}
 	
 	
-	/** 
+	/**
 	 * This is a separate function so that we avoid repeating the convention. 
 	 * The corresponding public function, which uses this, ALSO does the write-out if necessary.
 	 */
@@ -4748,7 +5080,7 @@ class Subcorpus
 	private function create_dumpfile()
 	{
 		$outpath = $this->generate_dumpfile_path();
-				
+		
 		switch ($this->mode)
 		{
 		case self::MODE_ARBITRARY:
@@ -4828,7 +5160,7 @@ class Subcorpus
 							}
 						}
 					}
-
+					
 					++$seqpos;
 				}
 				/* and write the contents of the buffer at loop end */
@@ -4877,13 +5209,13 @@ class ScopeSize
 {
 	/** Size in tokens */
 	public $tokens = 0;
-
+	
 	/** Size in items (texts, xml ranges, etc.) */
 	public $items  = 0;
-
+	
 	/** If the scope is defined by (for instance speaker) ids then the n of Ids can be placed here.*/
 	public $item_ids = 0;
-
+	
 	/** Contains the type of item contained in this scope, by XML ID string. 
 	 *  If they are texts, = "text". If they are nondescript cpos pairs, = ''. */
 	public $item_type   = '';
@@ -4899,7 +5231,7 @@ class ScopeSize
 	 * item_ids - 4   (speakers)
 	 * item_identifier - 'who' (speaker ID code is in u_who) (note the breakdown of such attributes is as in the QueryScope etc.)
 	 * 
-	 * TODO, document further with more examples here. plus  actually make use of this class!!!           
+	 * TODO, document further with more examples here. plus  actually make use of this class!!!
 	 */
 	
 	/* the constructor is just for quick setup; it allows an associative array also */
@@ -5015,7 +5347,7 @@ function uncache_restrictions_by_xml($corpus, $xml_handle)
 	 */
 	$xml_info = get_xml_info($corpus, $xml_handle);
 	$xml_handle = $xml_info->att_family; /* always safe because a faily head maps to itself. */
-
+	
 	while ($o = mysqli_fetch_object($result))
 		if (preg_match("/\^$xml_handle\b/", $o->serialised_restriction)) 
 			delete_restriction_from_cache($o->id);
@@ -5120,7 +5452,7 @@ function untranslate_restriction_cpos_from_db($data)
 function translate_restriction_cpos_to_db($cpos_collection)
 {
 	$data = '';
-
+	
 	foreach($cpos_collection as $pair)
 		$data .= pack("VV", $pair[0], $pair[1]);
 	
@@ -5171,7 +5503,7 @@ function get_list_of_subcorpora($include_last_restrictions = false)
 {
 	global $User;
 	global $Corpus;
-
+	
 	$exclude = ($include_last_restrictions ? '' : " and name != '--last_restrictions'");
 	
 	$result = do_sql_query("select name from saved_subcorpora where user='{$User->username}' and corpus='{$Corpus->name}'$exclude");
@@ -5197,7 +5529,7 @@ function get_list_of_subcorpora($include_last_restrictions = false)
 function get_subcorpus_name_mapper($corpus = NULL)
 {
 	$sql = "select id, name from saved_subcorpora";
-
+	
 	if (!empty($corpus))
 		$sql .= " where corpus = '" . escape_sql($corpus) . "'";
 	
@@ -5219,7 +5551,7 @@ function get_subcorpus_name_mapper($corpus = NULL)
 function get_subcorpus_corpus_mapper($corpus = NULL)
 {
 	$sql = "select id, corpus from saved_subcorpora";
-
+	
 	if (!empty($corpus))
 		$sql .= " where corpus = '" . escape_sql($corpus) . "'";
 	
@@ -5292,12 +5624,12 @@ function sort_positionlist($list)
 function translate_itemlist_to_where($item_list, $fieldname = 'text_id')
 {
 	$fieldname = cqpweb_handle_enforce($fieldname);
-
+	
 	if (is_array($item_list))
 		$list = $item_list;
 	else
 		$list = explode(' ', $item_list);
-
+	
 	return " ($fieldname in ('" . implode ( "','", $list ) . "') ) ";
 }
 
@@ -5392,9 +5724,11 @@ function check_id_list_valid($corpus, $idlink_handle, $id_list)
 function check_real_idlink_id($corpus, $idlink_handle, $id)
 {
 	$t = get_idlink_table_name($corpus, $idlink_handle);
-
+	
 	$id = escape_sql($id);
 	
 	return ( 0 < mysqli_num_rows(do_sql_query("select `__ID` from `$t` where `__ID` = '$id'")) );
 }
+
+
 

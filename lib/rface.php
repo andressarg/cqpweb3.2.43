@@ -376,6 +376,7 @@ abstract class SlaveFace
 			if (!empty($this->slave_error_pipe_checker))
 				array_walk($lines, $this->slave_error_pipe_checker);
 			
+// donm't debug alert;error() does it. 
 			$str = "$this->slave_name error output:\n\t" . implode("\n\t", $lines) . "\n";
 			$this->debug_alert($str);
 			
@@ -442,6 +443,8 @@ class RFace extends SlaveFace
 	const VALTYPE_ARRAY   =  4;
 	const VALTYPE_UNDEF   =  5;
 	
+    const CHART_FILETYPE_PNG = 'png';
+    //TODO more, and use below. 
 	
 	
 	/* member variables : general */
@@ -488,6 +491,7 @@ class RFace extends SlaveFace
 		$this->slave_executable = 'R';
 		$this->slave_opts = '--slave --no-readline';
 		$this->slave_error_pipe_checker = [ $this, 'check_error_string_for_execution_handled' ];
+        // FIXME use closure above instead? to avoid the circular reference. 
 		
 		parent::__construct($path_to_r, $debug, $debug_dest, $debug_dest_autoclose);			
 		
@@ -571,7 +575,7 @@ class RFace extends SlaveFace
 			{
 //$el= "ERR::";while ($ll = fgets($this->handle[2]))$el.=$ll;
 //var_dump($el);
-				$this->error("Read from pipe failed; probably means a syntax error\n");
+				$this->error("Read from pipe failed, due to syntax error or R internal error.\n");
 				return false;
 			}
 
@@ -613,7 +617,7 @@ class RFace extends SlaveFace
 			return $result;
 	}
 
-	protected function check_error_string_for_execution_handled($str)
+	protected function check_error_string_for_execution_handled($str) // TODO shouldn't this be "halted"?
 	{
 		if (preg_match('/\bexecution\s+halted\b/i', $str))
 			$this->execution_halted = true;
@@ -621,6 +625,7 @@ class RFace extends SlaveFace
 	
 	public function check_execution_halted()
 	{
+// FIXME this will only work if the global errro pipe handler is still [this, check_error_string_for_execution_handled] -- whihc isfragile. 
 		if (is_null($this->execution_halted))
 			$this->read_error_pipe();
 		return $this->execution_halted;
@@ -646,7 +651,7 @@ class RFace extends SlaveFace
 	 * Gets the version of the current R executable.
 	 * 
 	 * @param string $what  Can have one of the following values:
-	 *               "all" -- return the version string in full
+	 *               "all" -- return the version string in full (the default)
 	 *               "version" -- return just the version number xx.yy.zz
 	 *               "date" -- return just the build date yyyy-mm-dd 
 	 */
@@ -863,15 +868,15 @@ class RFace extends SlaveFace
 	 *                              that name already exists, it will be overwritten.
 	 * @param  string $data         The data frame to be loaded (string representation of table, 
 	 *                              or 2d array). Passed by reference, but not modified.
-	 * @param  bool $header_row     Boolean: does the data contain a header row? (Header row = 
+	 * @param  bool   $header_row   Boolean: does the data contain a header row? (Header row = 
 	 *                              everything up to or including the first \n in a string; or,
 	 *                              the first member of each array (the first array iff $transpose)
 	 *                              contains a header string.) Defaults to true.
-	 * @param  bool $header_col     Boolean: does the data contain a header column? (Header column = 
+	 * @param  bool   $header_col   Boolean: does the data contain a header column? (Header column = 
 	 *                              everything up to the first \t per line in a string; or,
 	 *                              the first array (the first member of each array iff $transpose)
 	 *                              contains a header string.) Defaults to true.
-	 * @param  bool $transpose      Boolean: if true, the two dimensions of an array are swopped.
+	 * @param  bool   $transpose    Boolean: if true, the two dimensions of an array are swopped.
 	 * 
 	 * @return bool                 True if load successful, otherwise false. 
 	 */
@@ -1548,22 +1553,21 @@ class RFace extends SlaveFace
 	{
 		if ( ! $this->error_if_not_object_exists($obj, "dimensions"))
 			return false;
-		else
-		{
-			$dims = $this->read_execute("dim($obj)");
 
-			/* account for one-D objects */
-			if(is_null($dims))
-				$dims = array($this->sizeof($obj));
+		$dims = $this->read_execute("dim($obj)");
 
-			return $dims;
-		}
+		/* account for one-D objects */
+		if(is_null($dims))
+			$dims = array($this->sizeof($obj));
+
+		return $dims;
 	}
 	
 	public function factor_levels($obj)
 	{
 		if ( ! $this->error_if_not_object_exists($obj, "factor_levels"))
 			return false;
+// TODO seems incomplete?
 	}
 	
 	/**
@@ -1599,6 +1603,7 @@ class RFace extends SlaveFace
 					return $dont_repeat_me[] = $curr;
 			}
 		}
+// TODO, use hash keys for names in the above instead of hash valeus.
 		
 		/* sanity check, should not be reached */
 		return $this->error("New object name could not be generated.\n");
@@ -1733,8 +1738,16 @@ class RFace extends SlaveFace
 	 */
 	public function load_library($lib)
 	{
-		if ($this->library_is_available($lib))
-			$this->execute("library($lib)");
+		if (!$this->library_is_available($lib))
+            return false;
+		if (false !== $this->execute("library($lib)"))
+		{
+			/* sometimes, successfully loading a library scribbles all over stderr;
+			 * so having loaded a library, clean out the error pipe. */
+			$this->read_error_pipe();
+			return true;
+		}
+		return false;
 	}
 	
 	/** 

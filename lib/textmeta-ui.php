@@ -114,8 +114,9 @@ echo print_html_header($Corpus->title . ': viewing text metadata -- CQPweb', $Co
 			/* this expansion is hardwired */
 			else if ($field == 'words')
 			{
-				$desc = 'No. words in text';
-				$show = number_format($value, 0);
+				/* save for last */
+				$n_words_row = '<tr><td class="concordgrey">No. words in text</td><td class="concordgeneral">' . number_format($value, 0) . "</td></tr>\n";
+				continue;
 			}
 			/* don't show the CQP delimiters for the file */
 			else if ($field == 'cqp_begin' || $field == 'cqp_end')
@@ -124,6 +125,8 @@ echo print_html_header($Corpus->title . ': viewing text metadata -- CQPweb', $Co
 		
 		echo '<tr><td class="concordgrey">' , $desc, '</td><td class="concordgeneral">' , $show, "</td></tr>\n";
 	}
+	
+	echo $n_words_row;
 	
 	?>
 </table>

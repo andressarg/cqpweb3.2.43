@@ -43,7 +43,7 @@ function print_statistic_form_options($index_to_select)
 	}
 	
 	$output .= "<option value=\"".COLLSTAT_RANK_FREQ.'" ' . ($index_to_select == COLLSTAT_RANK_FREQ ? ' selected' : '') . ">{$statistic[COLLSTAT_RANK_FREQ]['desc']}</option>";
-
+	
 	return $output;
 }
 
@@ -52,7 +52,7 @@ function print_statistic_form_options($index_to_select)
 function print_fromto_form_options($colloc_range, $index_to_select_from, $index_to_select_to)
 {
 	global $Corpus;
-
+	
 	/* In the /usr context, there is no corpus... */
 	if ($Corpus->specified && $Corpus->main_script_is_r2l)
 	{
@@ -64,7 +64,7 @@ function print_fromto_form_options($colloc_range, $index_to_select_from, $index_
 		$rightlabel = ' to the Right';
 		$leftlabel = ' to the Left'; 
 	}
-
+	
 	$output1 = $output2 = '';
 	for ($i = -$colloc_range ; $i <= $colloc_range ; $i++)
 	{
@@ -109,7 +109,9 @@ function print_freqalone_form_options($index_to_select)
 
 
 
-
+/**
+ * Returns a hash whose keys are the COLLSTAT constants.
+ */
 function load_statistic_info()
 {
 	static $info = NULL;
@@ -117,7 +119,7 @@ function load_statistic_info()
 		return $info;
 	
 	$info = array();
-
+	
 	/* the labels for the different stats are as follows ... */
 	/* note, the 0 is a special index - ie no statistic! (use in if statements and the like) */
 	$info[COLLSTAT_RANK_FREQ]['desc'] = 'Rank by frequency';
@@ -696,4 +698,5 @@ function collocation_write_download(
 		echo "\t{$row['text_id_count']}$sig$eol";
 	}
 }
+
 

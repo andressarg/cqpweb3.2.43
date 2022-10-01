@@ -1276,7 +1276,7 @@ if ($delete_input_files){squawk("delete_inputs is trooooooooo " );/*squawk( prin
 			$handle = cqpweb_handle_enforce($handle);
 			$cwb_in .= "+$handle";
 			$description = "Attribute ``$handle'' of XML element ``$xml_element";
-			$this->sql_for_corpus[] = sql_for_s_att_insert($this->corpus_name, $handle, "{$xml_element}_{$handle}", $description, $dt);
+			$this->sql_for_corpus[] = sql_for_s_att_insert($this->corpus_name, "{$xml_element}_{$handle}", $xml_element, $description, $dt);
 		}
 		
 		$this->s_array[] = $cwb_in;

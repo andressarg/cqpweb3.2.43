@@ -406,8 +406,9 @@ function uploaded_file_gzip($filename, $in_admin_area = false)
 
 	$zip_path = $path . '.gz';
 	
-	$source = fopen($path, "rb");
-	if (!($dest = gzopen ($zip_path, "wb")))
+	if (!($source = fopen($path, "rb")))
+		exiterror('Your request could not be completed - file to compress could not be opened.');
+	if (!($dest = gzopen($zip_path, "wb")))
 		exiterror('Your request could not be completed - compressed file could not be opened.');
 
 	php_execute_time_unlimit();
@@ -436,22 +437,31 @@ function uploaded_file_gunzip($filename, $in_admin_area = false)
 	if (!preg_match('/\.gz$/', $filename))
 		exiterror('Your request could not be completed - that file does not appear to be compressed.');
 
-	$unzip_path = substr($path, -3);
+	$unzip_path = substr($path, 0, -3);
 	
 	if (!($source = gzopen($path, "rb")))
 		exiterror('Your request could not be completed - compressed file could not be opened.');
-	$dest = fopen($unzip_path, "wb");
+	
+    if (!($dest = fopen($unzip_path, "wb")))
+		exiterror('Your request could not be completed - decompressed file could not be opened.');
 
 	php_execute_time_unlimit();
+
 	while ('' !== ($buffer = gzread($source, 4096))) 
-		fwrite($dest, $buffer);
+		$e = fwrite($dest, $buffer);
+
 	php_execute_time_relimit();
 
-	gzclose($source);
-	fclose ($dest);
-			
-	unlink($path);
+	$e = gzclose($source);
+	if (!$e)		echo "gzclose reports error\n"; 
+	
+	$e = fclose ($dest);
+	if (!$e)		echo "fclose reports error\n"; 
+	
+	$e = unlink($path);
 	chmod($unzip_path, 0664);
+	
+	flush();
 }
 
 
@@ -499,7 +509,7 @@ function do_uploaded_file_view($filename, $in_admin_area = false)
 			header('Content-Type: text/html; charset=utf-8');
 		?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="UTF-8">
 		<title>CQPweb: viewing uploaded file</title>

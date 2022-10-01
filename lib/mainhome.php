@@ -196,7 +196,12 @@ echo print_html_header('CQPweb Main Page', $Config->css_path);
 	
 	<tr>
 		<th colspan="3" class="concordtable">
-			Corpora available on this server (<a href="usr/index.php?ui=corpusAccess">click here to view your own corpus access privileges</a>)
+			Corpora available on this server
+			<?php 
+			if ($User->logged_in)
+				echo '(<a href="usr/index.php?ui=corpusAccess">click here to view your own corpus access privileges</a>)';
+			echo "\n";
+			?>
 		</th>
 	</tr>
 	

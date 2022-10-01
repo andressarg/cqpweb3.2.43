@@ -19,34 +19,17 @@ $mysql_schema  = 'cqpweb_db';
 $mysql_server  = 'localhost';
 
 
+
 /* ---------------------- *
  * server directory paths *
  * ---------------------- */
 
 $cqpweb_tempdir   = '/srv/cqpwebdata/cache';
-$cqpweb_uploaddir = '/srv/cqpwebdata/srv/cqpwebdata/upload';
+$cqpweb_uploaddir = '/srv/cqpwebdata/upload';
 $cwb_datadir      = '/srv/cqpwebdata/index';
 $cwb_registry     = '/srv/cqpwebdata/registry';
 
 
-/* --------------------- *
- * location of programas *
- * --------------------- */
-
-//$path_to_cwb = "/usr/local/cwb-3.4.15/bin";
 
 
-/* ------------- *
- * look and feel *
- * ------------- */
-
-$homepage_welcome_message = "Olá!";
-
-
-
-/* ------------------ *
- * user corpus system *
- * ------------------ */
-
-$colleaguate_system_enabled = true;
-$user_corpora_enabled = true;
+$sql_local_infile_disabled  = 'true';

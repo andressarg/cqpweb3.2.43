@@ -40,7 +40,7 @@ require('../lib/useracct-lib.php');
 
 
 /* declare global variables */
-$Corpus = $User = $Config = NULL;
+$Corpus = $User = $Config = $m = NULL;
 
 cqpweb_startup_environment(CQPWEB_STARTUP_DONT_CONNECT_CQP);
 
@@ -162,14 +162,6 @@ $cmd = "{$Config->path_to_cwb}cwb-decode $flags -r \"{$Config->dir->registry}\" 
 $proc = popen($cmd, 'r');
 
 
-/* send the HTTP header */
-if ($zip_mode)
-	header("Content-Type: application/zip");
-else
-	header("Content-Type: text/plain; charset=utf-8");
-	
-header("Content-Disposition: attachment; filename=$filename");
-
 
 $collection = '';
 $n_key_items = 0;
@@ -178,6 +170,9 @@ $n_key_items = 0;
 if (!$zip_mode)
 {
 	/* mode to download a single text file */
+	header("Content-Type: text/plain; charset=utf-8");
+	header("Content-Disposition: attachment; filename=$filename");
+	
 	while (false !== ($line = fgets($proc)))
 	{
 		if ($use_sc && $format == 'word_annot')
@@ -240,6 +235,9 @@ else
 				{
 					/* to avoid overfilling RAM: commit after a certain N of files. */
 					$z->close();
+// i don't know whether this will work. Does the Zip extension load the whole zip file every time.
+unset($zip);
+$zip = new ZipArchive;
 					$z->open($tempzip);
 					$n_files = 0;
 				}
@@ -248,7 +246,7 @@ else
 			$prev_text_id = $m[1];
 
 			$collection .= $line;
-			/* note, in this case <text_id> is always incldued at the start/end of each file ... */
+			/* note, in this case <text_id> is always included at the start/end of each file ... */
 		}
 		else
 		{
@@ -267,10 +265,13 @@ else
 		$collection .= ($format == 'col' ? '' : $eol);
 		$z->addFromString("corpus/{$prev_text_id}.txt", $collection);
 	}
-		
+	
 
 	$z->close();
 	
+	
+	header("Content-Type: application/zip");
+	header("Content-Disposition: attachment; filename=$filename");
 	readfile($tempzip);
 	
 	unlink($tempzip);

@@ -38,6 +38,7 @@ require('../lib/environment.php');
 
 /* include function library files */
 require('../lib/general-lib.php');
+require('../lib/query-lib.php');
 require('../lib/html-lib.php');
 require('../lib/sql-lib.php');
 require('../lib/useracct-lib.php');

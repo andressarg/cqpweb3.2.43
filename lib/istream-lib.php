@@ -190,7 +190,7 @@ abstract class IntervalStreamBase implements IntervalStream
 // 	protected function fetch_interval_from_tabulated_stream(string $line) : ?array
 	protected function fetch_interval_from_tabulated_stream(string $line) //: array
 	{
-		if (false === $line)
+		if (empty($line))
 			return NULL;
 		else
 		{
@@ -260,6 +260,7 @@ abstract class IntervalStreamBase implements IntervalStream
 
 		++$this->ix;
 		$this->curr = $this->next;
+		$this->next_next = NULL;
 		$this->next_next = NULL;
 
 		if (!$this->curr)
@@ -359,6 +360,10 @@ class CposCollectionStream implements IntervalStream
 	private $ix = 0;
 	private $n;
 	
+	/** iff irreversible, collection entries are unset once the stream moves over them;
+	 * in this case, the stream can't go backwards! */
+	private $irreversible = false;
+	
 	public function __construct($data)
 	{
 		$this->data = $data;
@@ -397,17 +402,36 @@ class CposCollectionStream implements IntervalStream
 	{
 		if ($this->ix == $this->n)
 			return NULL;
-		return $this->data[$this->ix++] ?? NULL;
+		
+		if (!$this->irreversible)
+			return $this->data[$this->ix++] ?? NULL;
+		else 
+		{
+			$r = $this->data[$this->ix] ?? NULL;
+			unset($this->data[$this->ix]);
+			$this->ix++;
+			return $r;
+		}
 	}
 	
 // 	public function unget(array $interval = []) : void
 	public function unget(array $interval = [])
 	{
-		--$this->ix;
+		if (!$this->irreversible)
+			--$this->ix;
 	}
 	
 	public function seek(int $offset, int $whence) : bool
 	{
+		if ($this->irreversible)
+			if (    ($whence == SEEK_SET && $offset < $this->ix)
+					||
+					($whence == SEEK_CUR && $offset < 0)
+					||
+					($whence == SEEK_END && ($this->n - $offset) < $this->ix)
+				)
+				return false;
+					
 		switch($whence)
 		{
 		case SEEK_SET:    $this->ix  = $offset;                break;
@@ -430,7 +454,8 @@ class CposCollectionStream implements IntervalStream
 // 	public function rewind() : void
 	public function rewind()
 	{
-		$this->ix = 0;
+		if (!$this->irreversible)
+			$this->ix = 0;
 	}
 
 // 	public function size() : ?int
@@ -468,7 +493,7 @@ class CposCollectionStream implements IntervalStream
 				return true;
 		
 			case 1:
-				/* guess too high: make $guess the new celing, try again */
+				/* guess too high: make $guess the new ceiling, try again */
 				$ceiling = $guess;
 				continue 2;
 			
@@ -485,6 +510,11 @@ class CposCollectionStream implements IntervalStream
 					continue 2;
 			}
 		}
+	}
+	
+	public function set_irreversible(bool $new_setting)
+	{
+		$this->irreversible = $new_setting ? true : false;
 	}
 }
 
@@ -744,6 +774,7 @@ class XmlAttributeStream extends TabPipeStream implements IntervalStream
 		$this->att = $att;
 		$this->with_values = $with_values;
 		
+//TODO ->n() could be implemented here if we cache it in xml metadata and look it up here... */
 		parent::__construct('');
 	}
 	
@@ -753,11 +784,13 @@ class XmlAttributeStream extends TabPipeStream implements IntervalStream
 // 	protected function fetch_interval_from_tabulated_stream(string $line) : ?array
 	protected function fetch_interval_from_tabulated_stream(string $line) //: array
 	{
-		if (false === $line)
+		if (empty($line))
 			return NULL;
 		else
 		{
 			$a = explode("\t", trim($line, "\r\n"));
+// below can most likely be deleted as the bug is, I believe, now caught.
+if (3 != count($a)) {squawk ("bad array line 762, value= $line!!"); return NULL;}
 			if ($this->with_values)
 				return [ (int)$a[0], (int)$a[1], $a[2] ];
 			else

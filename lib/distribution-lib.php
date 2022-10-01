@@ -843,8 +843,8 @@ END_LAYOUT_HTML;
  * Writes a distribution table header to standard output.
  * 
  * @param DistInfo $dist_info
- * @param string  $classification_handle
- * @param string  $classification_desc
+ * @param string   $classification_handle
+ * @param string   $classification_desc
  */
 function do_distribution_table_header($dist_info, $classification_handle, $classification_desc)
 {
@@ -860,20 +860,17 @@ function do_distribution_table_header($dist_info, $classification_handle, $class
 			$region_unit = '<em>' . escape_html($dist_info->att_info->description) . '</em> IDs';
 	}
 	
-	
 	?>
-
+	
 	<tr>
 		<th <?php echo $dist_info->get_colspan_html(); ?> class="concordtable">
-			Based on classification: 
+			Based on classification:
 			<em><?php echo escape_html($classification_desc); ?></em>
 		</th>
 	</tr>
-
-	
 	<tr>
 		<td class="concordgrey">
-			Category 
+			Category
 			<a id="catSrtButton" class="menuItem hasToolTip" onClick="distTableSort(this, 'cat')" data-tooltip="Sort by category">[&darr;]</a>
 		</td>
 		<td class="concordgrey" align="center">Words in category</td>
@@ -881,7 +878,7 @@ function do_distribution_table_header($dist_info, $classification_handle, $class
 		<td class="concordgrey" align="center">Dispersion<br>(no. <?php echo $region_unit ?> with 1+ hits)
 		</td>
 		<td class="concordgrey" align="center">
-			Frequency 
+			Frequency
 			<a id="freqSrtButton" class="menuItem hasToolTip" onClick="distTableSort(this, 'freq')" data-tooltip="Sort by frequency per million">[&darr;]</a>
 			<br>
 			per million words in category
@@ -891,10 +888,10 @@ function do_distribution_table_header($dist_info, $classification_handle, $class
 		if ($dist_info->extrapolate_from_thinned)
 		{
 			?>
-
+			
 			<td class="concordgrey" align="center">Hits in category<br>(extrapolated)</td>
 			<td class="concordgrey" align="center">
-				Frequency 
+				Frequency
 				<a id="extrpSrtButton" class="menuItemh hasToolTip" onClick="distTableSort(this, 'extr')" 
 					data-tooltip="Sort by extrapolated frequency per million')"
 					>[&darr;]</a>
@@ -906,7 +903,7 @@ function do_distribution_table_header($dist_info, $classification_handle, $class
 			<?php
 		}
 		?>
-	
+		
 	</tr>
 
 	<?php
@@ -925,13 +922,13 @@ function do_distribution_table($dist_info, $classification_handle, $classificati
 {
 	global $Config;
 	global $Corpus;
-global $User;
+	
+//global $User;
 //if ($User->is_admin()) $Config->print_debug_messages = true;
 	
 	/* print header row for this table */
 	do_distribution_table_header($dist_info, $classification_handle, $classification_desc);
-
-
+	
 	/* a list of category descriptions, for later accessing */
 	if ('--text' == $dist_info->distribution_att)
 		$desclist = list_text_metadata_category_descriptions($Corpus->name, $classification_handle);
@@ -952,7 +949,7 @@ global $User;
 	$max_per_mill = 0;
 	$master_array = array();
 	$master_ix = 0;
-
+	
 	
 	/* the main query that gets table data */
 	$sql = 
@@ -966,13 +963,8 @@ global $User;
 		GROUP BY md.`$classification_handle`
 		ORDER BY md.`$classification_handle`
 		";
-
 	$result = do_sql_query($sql);
-//show_var($result);
-//$x=$result->num_rows;
-//show_var($x);
-//if ($Config->print_debug_messages) exit;
-
+	
 	/* for each category: */
 	while ($c = mysqli_fetch_object($result))
 	{
@@ -991,60 +983,38 @@ global $User;
 
 		/* string containing this category's restriction - for the intersection */
 		$serialised_on_the_fly = $dist_info->qscope_serialiser . $classification_handle . '~' . $c->handle;
-//show_var($dist_info->qscope_serialiser);
-//show_var($serialised_on_the_fly);
-
 		// TODO might be better to factor out the above somewhere????
 
-
-
-// 		$scope_on_the_fly = $dist_info->query_record->qscope->get_intersect(QueryScope::new_by_unserialise("$^--text|$classification_handle~{$c->handle}"));
-
-if (!$User->is_admin())
-	if ('$^--text' != substr($serialised_on_the_fly, 0, 8)) exiterror("non text disatributionnot available");
-
-//var_dump($c);
-//squawk("About toi create intersect arg QS dfrom serialisation: '$serialised_on_the_fly'");
-$intersect_arg = QueryScope::new_by_unserialise($serialised_on_the_fly);
-//show_var($intersect_arg);
-
-
-squawk("About to create scope-on-the-fly");
-// next call has the problem. 
-//for ($i = 0 ; $i < 1000 ; $i++) echo "                       ";
-//flush();
-$scope_on_the_fly = $dist_info->query_record->qscope->get_intersect($intersect_arg);
-squawk("done, here it is:");
-show_var($scope_on_the_fly);
-//flush();
-
-//if ($User->is_admin())exit;
-//		$scope_on_the_fly = $dist_info->query_record->qscope->get_intersect(QueryScope::new_by_unserialise($serialised_on_the_fly));
+//squawk("About to create intersect arg QS dfrom serialisation: '$serialised_on_the_fly'");
+//$intersect_arg = QueryScope::new_by_unserialise($serialised_on_the_fly);
+//$scope_on_the_fly = $dist_info->query_record->qscope->get_intersect($intersect_arg);
+		$scope_on_the_fly = $dist_info->query_record->qscope->get_intersect(QueryScope::new_by_unserialise($serialised_on_the_fly));
 		if (false === $scope_on_the_fly)
 			exiterror("Drawing this distribution table requires calculation of a subsection intersect that is not yet possible in this version of CQPweb.");
 		else
-// 			list ($words_in_cat, $texts_in_cat) = $tempvar;
 		{
 			$words_in_cat = $scope_on_the_fly->size_tokens();
 			$items_in_cat = $scope_on_the_fly->size_items();
 			$ids_in_cat   = $scope_on_the_fly->size_ids();
-// temp bodge: (cos number of ids is tucked in items her5e...... 
+// FIXME temp bodge: (cos number of ids is tucked in items her5e...... 
 			if (0 == $ids_in_cat)
 				$ids_in_cat = $items_in_cat;
-// end temp bodge. TODO
+// end temp bodge.
 //			if ('' != ($item_type = $scope_on_the_fly->get_item_type()))
 //				$ids_in_cat = $scope_on_the_fly->size_ids();
 		}
 // end temp replacement */
-		if (is_null($words_in_cat))
-			$words_in_cat = 0;
-		if (is_null($ids_in_cat))
-			$ids_in_cat = 0;
+		$words_in_cat = $words_in_cat ?? 0;
+// TODO above line couldn be incorporated into the ELSE above.
+//		if (is_null($words_in_cat))
+//			$words_in_cat = 0;
+		$ids_in_cat = $ids_in_cat ?? 0;
+//		if (is_null($ids_in_cat))
+//			$ids_in_cat = 0;
 		
 		
 		if (DistInfo::PROG_UI_CHART == $dist_info->program)
 		{
-
 			/* build up an array! */
 			$c->words_in_cat = $words_in_cat;
 			$c->per_mill = (
@@ -1057,15 +1027,16 @@ show_var($scope_on_the_fly);
 			
 			/* stash $c */
 			$master_array[$master_ix++] = $c;
-			/* ++ so that the next time we iterate, it goes in a differtent slot. */
-		
-					
+			/* ++ so that the next time we iterate, it goes in a different slot. */
+			
+			
 			/* the print loop is for the table only. */
 			continue;
 		}
-
+		
 //TODO dist postprocess not working yet w/ anything other than text
-		if ('--text' == $dist_info->distribution_att)
+//		if ('--text' == $dist_info->distribution_att)
+		if ('text' == $scope_on_the_fly->get_item_type())
 		{
 			$link = "concordance.php?qname={$dist_info->query_record->qname}&newPostP=dist&newPostP_distCateg=$classification_handle&newPostP_distClass={$c->handle}";
 			$link_begin = '<a href="' . $link . '">';
@@ -1073,13 +1044,14 @@ show_var($scope_on_the_fly);
 		}
 		else
 			$link_begin = $link_end = $link = '';
-
+		
 		/* print a data row */
 		?>
-
+		
 		<tr>
 			<td class="concordgeneral" id="<?php echo $c->handle;?>">
 				<?php 
+				// TODO needed? will empty description have been checked for when desclist was built? --> check this
 				if (empty($desclist[$c->handle]))
 					echo $c->handle, "\n";
 				else
@@ -1091,12 +1063,12 @@ show_var($scope_on_the_fly);
 			</td>
 			<td class="concordgeneral" align="center">
 				<?php echo $link_begin, number_format($c->hits), $link_end, "\n"; ?>
-				<!-- <a href="<?php echo $link; ?>"><?php echo number_format($c->hits); ?></a>-->
 			</td>
 			<td class="concordgeneral" align="center">
-<?php  
-//TODO  the following needs to be conditional: ids if the interese4cted restriction is all id-based (e.g text + id metadata)
+<?php
+//TODO  the following needs to be conditional: ids if the intersected restriction is all id-based (e.g text + id metadata)
 //but intervals if  it's arbitrary slices.
+// or perhaops, if just arbitrary ranges, just print "-" (cos result prob not meaningful?)
 ?>
 				<?php echo number_format($c->n_ids), ' out of ', number_format($ids_in_cat), "\n"; ?> 
 			</td>
@@ -1136,33 +1108,35 @@ show_var($scope_on_the_fly);
 		if (0 == $max_per_mill)
 		{
 			/* no category in this classification has any hits */
-			echo "
+			echo <<<END_HTML
+					
 					<tr>
-						<th class=\"concordtable\">
+						<th class="concordtable">
 							No category within the classification scheme 
-							\"$classification_desc\" has any hits in it.
+							"$classification_desc" has any hits in it.
 						</th>
-	
 					</tr>
 				</table>
-				<table class=\"concordtable fullwidth\">\n"
- 				;
+				<table class="concordtable fullwidth">
+				
+END_HTML;
 			return;
 		}
 		
 		$n = count($master_array);
 		$num_columns = $n + 1;
-	
+		
 		/* header row */
 		
 		?>
+		
 		<tr>
 			<th colspan="<?php echo $num_columns; ?>" class="concordtable">
-				<?php echo "Based on classification: <i>$classification_desc</i>"; ?>
+				<?php echo "Based on classification: <em>$classification_desc</em>", "\n"; ?>
 			</th>
 		</tr>
 		<tr>
-			<td class="concordgrey"><b>Category</b></td>
+			<td class="concordgrey"><strong>Category</strong></td>
 			<?php
 			/* line of category labels */
 			for($i = 0; $i < $n; $i++)
@@ -1175,31 +1149,32 @@ show_var($scope_on_the_fly);
 			<?php
 			
 			/* line of bars */
-		
+			
 			for ($i = 0; $i < $n; $i++)
 			{
+				// TODO needful? see note above, desclist may have beenb checked when built. 
 				if (empty($desclist[$master_array[$i]->handle]))
 					$this_label = $master_array[$i]->handle;
 				else
-					$this_label = escape_html($desclist[$master_array[$i]->handle]);
-		
-				$html_for_hover = "Category: <b>$this_label</b><br><hr color=&quot;#000099&quot;>" 
+					$this_label = $desclist[$master_array[$i]->handle];
+				
+				//TODO get rid of <font> in the hover text
+				$html_for_hover = "Category: <strong>$this_label</strong><br><hr color=&quot;#000099&quot;>" 
 					. '<font color=&quot;#DD0000&quot;>' . number_format($master_array[$i]->hits) . '</font> hits in '
 					. '<font color=&quot;#DD0000&quot;>' . number_format($master_array[$i]->words_in_cat) 
 					. '</font> words.'
 		 			;
 				if ($dist_info->extrapolate_from_thinned)
 					$html_for_hover 
-						.= '<br><hr color=&quot;#000099&quot;><b>Extrapolated</b> no. of hits: <font color=&quot;#DD0000&quot;>' 
+						.= '<br><hr color=&quot;#000099&quot;><strong>Extrapolated</strong> no. of hits: <font color=&quot;#DD0000&quot;>' 
 						. number_format($master_array[$i]->hits * $dist_info->extrapolation_factor, 0)
 						. '</font> hits<br>(<font color=&quot;#DD0000&quot;>'
 						. number_format($master_array[$i]->per_mill * $dist_info->extrapolation_factor, 2)
 						. '</font> per million words).'
 						;
-					
-		
-				$this_bar_height = round( ($master_array[$i]->per_mill / $max_per_mill) * 100, 0);
-		
+				
+				$this_bar_height = round( ($master_array[$i]->per_mill / $max_per_mill) * 100 , 0);
+				
 				/* make this a link to the limited query when I do likewise in the distribution table */
 				echo '<td align="center" valign="bottom" class="concordgeneral">'
 					, '<a id="barlink', $i, '" data-tooltip="' , $html_for_hover , '">'
@@ -1208,14 +1183,14 @@ show_var($scope_on_the_fly);
 						, '" width="70" height="'
 						, $this_bar_height
 						, '" align="absbottom"></a></td>'
+					, "\n"
 					;
 			}
 			
 			?>
-			
 		</tr>
 		<tr>
-			<td class="concordgrey"><b>Hits</b></td>
+			<td class="concordgrey"><strong>Hits</strong></td>
 			<?php
 			/* line of hit counts */
 			for ($i = 0; $i < $n; $i++)
@@ -1224,84 +1199,77 @@ show_var($scope_on_the_fly);
 			?>
 		</tr>
 		<tr>
-			<td class="concordgrey"><b>Cat size (MW)</b></td>
-			
+			<td class="concordgrey"><strong>Cat size (MW)</strong></td>
 			<?php
-			
 			/* line of cat sizes */
 			for ($i = 0; $i < $n; $i++)
-				echo '<td class="concordgrey" align="center">' 
+				echo '<td class="concordgrey" align="center">'
 					, number_format(($master_array[$i]->words_in_cat / 1000000.0), 2)
 					, '</td>'
 					;
+			echo "\n";
 			?>
-			
 		</tr>
 		<tr>
-			<td class="concordgrey"><b>Freq per M</b></td>
-			
+			<td class="concordgrey"><strong>Freq per M</strong></td>
 			<?php
-			
 			/* line of per-million-words */
 			for ($i = 0; $i < $n; $i++)
-				echo '<td class="concordgrey" align="center">' 
+				echo '<td class="concordgrey" align="center">'
 					, number_format($master_array[$i]->per_mill, 2)
 					, '</td>'
 					;
-			
-			/* end the table and re-start for the next graph, so it can have its own number of columns */
+			echo "\n";
+			/* Now, end the table and re-start for the next graph, so it can have its own number of columns */
 			?>
-		
 		</tr>
 	</table>
 	
 	<table class="concordtable fullwidth">
 	
-	<?php
+		<?php
 	}
-	else 
+	else
 	{
 		/* print total row of table */
 		?>
 		
 		<tr>
 			<td class="concordgrey">Total:</td>
-			
 			<td class="concordgrey" align="center">
-				<?php echo number_format($total_words_in_all_cats); ?> 
+				<?php echo number_format($total_words_in_all_cats), "\n"; ?>
 			</td>
 			<td class="concordgrey" align="center">
-				<?php echo number_format($total_hits_in_all_cats); ?> 
+				<?php echo number_format($total_hits_in_all_cats), "\n"; ?>
 			</td>
 			<td class="concordgrey" align="center">
-				<?php echo number_format($total_hit_ids_in_all_cats); ?> out of <?php echo number_format($total_ids_in_all_cats); ?> 
+				<?php echo number_format($total_hit_ids_in_all_cats); ?> out of <?php echo number_format($total_ids_in_all_cats), "\n"; ?>
 			</td>
 			<td class="concordgrey" align="center">
-				<?php echo number_format(($total_hits_in_all_cats / $total_words_in_all_cats) * 1000000, 2); ?> 
+				<?php echo number_format(($total_hits_in_all_cats / $total_words_in_all_cats) * 1000000, 2), "\n"; ?>
 			</td>
-				
 			<?php
 			if ($dist_info->extrapolate_from_thinned)
 			{
+				echo "\n";
 				?>
-				
 				<td class="concordgrey" align="center">
-					<?php echo number_format($total_hits_in_all_cats * $e_factor); ?> 
+					<?php echo number_format($total_hits_in_all_cats * $e_factor), "\n"; ?>
 				</td>
 				<td class="concordgrey" align="center">
-					<?php echo number_format(($total_hits_in_all_cats / $total_words_in_all_cats) * 1000000 * $e_factor, 2); ?> 
+					<?php echo number_format(($total_hits_in_all_cats / $total_words_in_all_cats) * 1000000 * $e_factor, 2), "\n"; ?>
 				</td>
-				
 				<?php
 			}
+			echo "\n";
 			?>
-	
+			
 		</tr>
-	
+		
 		<?php
 	}
 
-}		
+}
 
 
 
@@ -1315,7 +1283,7 @@ show_var($scope_on_the_fly);
  * @param DistInfo     $dist_info      Script configuration object.
  */
 function do_distribution_classifications($dist_info)
-{	
+{
 	$array_of_classifications = (
 			'--text' == $dist_info->distribution_att 
 			?
@@ -1323,18 +1291,17 @@ function do_distribution_classifications($dist_info)
 			:
 			$dist_info->idlink_classification_fields[$dist_info->distribution_att]
 			);
-	
 	?>
 	
 	<table class="concordtable fullwidth">
 	
 	<?php 
 	foreach($array_of_classifications as $classification_handle => $classification_desc)
-		do_distribution_table($dist_info, $classification_handle, $classification_desc);		
+		do_distribution_table($dist_info, $classification_handle, $classification_desc);
 	?>
 	
 	</table>
-
+	
 	<?php 
 }
 
@@ -1375,6 +1342,7 @@ function do_distribution_freq_extremes($dist_info)
 		ON db.`$id_field_handle` = md.`{$dist_info->join_field}`
 		GROUP BY db.`$id_field_handle`
 		HAVING hits > 0
+		AND `$id_field_handle` != ''
 		";
 	
 	$max_sql = $base_sql . "ORDER BY per_mill desc LIMIT {$Config->dist_num_files_to_list} ";
@@ -1389,7 +1357,7 @@ function do_distribution_freq_extremes($dist_info)
 	<table class="concordtable fullwidth">
 	
 	<?php 
-		
+	
 	foreach (array ('most' => $max_sql, 'least' => $min_sql) as $superlative_label => $sql)
 	{
 		/* get bits of text ready for start of table */
@@ -1398,7 +1366,8 @@ function do_distribution_freq_extremes($dist_info)
 		if ('--text' == $dist_info->distribution_att)
 			$header_message .= ' in the following texts' 
  				. ('least' == $superlative_label ? ' (only texts with at least 1 hit are included)' : '') 
-				. ':';
+				. ':'
+				;
 		else
 			$header_message 
 				.= ' with the following ' 
@@ -1406,8 +1375,8 @@ function do_distribution_freq_extremes($dist_info)
  				. '-type IDs' 
  				. ('least' == $superlative_label ? ' (only IDs with at least 1 hit are included)' : '') 
 				. ':'
- 				;
-		    // TODO this is rotten way to word it. But I can't think of anything better right now. 
+				;
+ 			// TODO this is rotten way to word it. But I can't think of anything better right now. 
 		
 		
 		/* render start of table */
@@ -1454,7 +1423,7 @@ function do_distribution_freq_extremes($dist_info)
 			}
 
 			?>
-		
+			
 			<tr>
 				<td align="center" class="concordgeneral">
 					<a href="<?php echo $idlink_url; ?>"><?php echo $o->$id_field_handle; ?></a>
@@ -1470,7 +1439,7 @@ function do_distribution_freq_extremes($dist_info)
 				</td>
 			</tr>
 			
-			<?php			
+			<?php
 			
 		}
 		
@@ -1478,7 +1447,7 @@ function do_distribution_freq_extremes($dist_info)
 	
 	/* all done, so now wrap up the table */
 	?>
-		
+	
 	</table>
 
 	<?php
@@ -1514,14 +1483,18 @@ function do_distribution_plaintext_download(DistInfo $dist_info)
 	$idlink_att_info          = $dist_info->att_info;
 
 	
-	$sql = "SELECT db.`$db_idfield` as item_id, md.`$join_ntoks` as n_tokens, count(*) as hits 
+	$sql = "SELECT 
+			db.`$db_idfield` as item_id, 
+			md.`$join_ntoks` as n_tokens, 
+			count(*) as hits 
 		FROM `$dbname` as db 
 		LEFT JOIN `$join_table` as md ON db.`$db_idfield` = md.`$join_field`
+		WHERE db.`$db_idfield` != ''
 		GROUP BY db.`$db_idfield`
 		ORDER BY db.`$db_idfield`";
 	
 	$result = do_sql_query($sql);
-	/* TODO (non-urgent) this seems to be quite a slow query to run.... check optimisation possible? */	
+	/* TODO (non-urgent) this seems to be quite a slow query to run.... check optimisation possible? */
 
 	$eol = $User->eol();
 	

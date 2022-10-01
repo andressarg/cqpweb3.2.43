@@ -47,7 +47,7 @@
 /*
  * version number of CQPweb 
  */
-define('CQPWEB_VERSION', '3.2.40');
+define('CQPWEB_VERSION', '3.2.43');
 
 
 /*
@@ -92,13 +92,12 @@ define('METADATA_TYPE_DATE',                   5);
  * User-database type constants
  */
 
+define('DB_TYPE_NONE',                         0);
 define('DB_TYPE_DIST',                         1);
 define('DB_TYPE_COLLOC',                       2);
 define('DB_TYPE_SORT',                         3);
 define('DB_TYPE_CATQUERY',                     4);
-define('DB_TYPE_PARLINK',					   5);
-
-
+define('DB_TYPE_PARLINK',                      5);
 
 /*
  * Collocation statistic constants
@@ -132,7 +131,7 @@ define('KEYSTAT_LR_CONSERVATIVE',              5);
 
 
 /* 
- * plugin type constants 
+ * Plugin type constants 
  */
 
 define('PLUGIN_TYPE_UNKNOWN',                  0);
@@ -148,7 +147,7 @@ define('PLUGIN_TYPE_ANY',                      1|2|4|8|16|32|64|128);
 
 
 /*
- * user account state constants
+ * User account state constants
  */
 
 define('USER_STATUS_UNVERIFIED',               0);
@@ -156,8 +155,9 @@ define('USER_STATUS_ACTIVE',                   1);
 define('USER_STATUS_SUSPENDED',                2);
 define('USER_STATUS_PASSWORD_EXPIRED',         3);
 
+
 /*
- * colleague link constants
+ * Colleague link constants
  */
 
 define('COLLEAGUATE_STATUS_UNDEFINED',         0);
@@ -165,8 +165,9 @@ define('COLLEAGUATE_STATUS_PENDING',           1);
 define('COLLEAGUATE_STATUS_ACTIVE',            2);
 define('COLLEAGUATE_STATUS_ANY',               3);
 
+
 /*
- * privilege types
+ * Privilege types
  */
 
 define('PRIVILEGE_TYPE_NO_PRIVILEGE',          0);	/* can be used to indicate absence of one or more privileges; not used in the DB except in error condition */
@@ -408,13 +409,10 @@ class CQPwebEnvConfig
 		/* and now, let's organise the directory variables into something saner */
 		$this->dir = new stdClass;
 		$this->dir->cache = $this->cqpweb_tempdir;
-		unset($this->cqpweb_tempdir);
 		$this->dir->upload = $this->cqpweb_uploaddir;
-		unset($this->cqpweb_uploaddir);
 		$this->dir->index = $this->cwb_datadir;
-		unset($this->cwb_datadir);
 		$this->dir->registry = $this->cwb_registry;
-		unset($this->cwb_registry);
+		unset($this->cqpweb_tempdir, $this->cqpweb_uploaddir, $this->cwb_datadir, $this->cwb_registry);
 		
 		/* CSS action based on run_location */
 		switch ($this->run_location)
@@ -432,7 +430,7 @@ class CQPwebEnvConfig
 		
 		
 		/* debug messages should be textonly ALWAYS in CLI, regardless of the setting in the config file. */
-		if (RUN_LOCATION_CLI == $this->run_location)
+		if (PHP_SAPI == 'cli')
 			$this->debug_messages_textonly = true;
 		
 		/* add further system config here. */
@@ -518,7 +516,7 @@ class CQPwebEnvConfig
 			break;
 			
 		default:
-			exiterror("Bad slave funciton handle  $which!!");
+			exiterror("Bad slave function handle  $which!!");
 		}
 	}
 	
@@ -591,7 +589,7 @@ class CQPwebEnvUser
 				
 				/* if the cookie token is more than half an hour old, delete and emit a new one; otherwise, touch the existing one. 
 				 * (so the token should only get used within a single session, or for the first connection of a subsequent session.) */
-				if (time() - 1800 > $checked->creation )
+				if (time() - 1800 > $checked->creation)
 					emit_new_cookie_token($username, 
 							(isset($_COOKIE[$Config->cqpweb_cookie_name . 'Persist']) && '1' === $_COOKIE[$Config->cqpweb_cookie_name . 'Persist'])
 						);
@@ -877,6 +875,7 @@ class CQPwebEnvCorpus
 				 * because the PWD is the working directory AT STARTUP.
 				 * On the other hand, we cannot use getcwd() as it will (on Linux at least) resolve symlinks! 
 				 * Whether the above will work on Windows is to be discovered. */ 
+// FIXME  for applicaitons, etc. the above is SUPER shonky. 
 			}
 			else
 			{
@@ -1182,25 +1181,6 @@ function cqpweb_startup_environment($flags = CQPWEB_STARTUP_NO_FLAGS, $run_locat
 	 * -------------- */
 
 	/* the very first thing we do is set up _GET, _POST etc. .... */
-
-	/* MAGIC QUOTES, BEGONE! */
-	
-	/* In PHP > 5.4 magic quotes don't exist, but that's OK, because the function in the test will always
-	 * return false (it was NOT removed in PHP 7.0 unlike other magic quotes functions). */
-	
-	if (get_magic_quotes_gpc()) 
-	{
-		foreach ($_POST as $k => $v) 
-		{
-			unset($_POST[$k]);
-			$_POST[stripslashes($k)] = stripslashes($v);
-		}
-		foreach ($_GET as $k => $v) 
-		{
-			unset($_GET[$k]);
-			$_GET[stripslashes($k)] = stripslashes($v);
-		}
-	}
 	
 	/* WE ALWAYS USE GET! */
 	
@@ -1302,10 +1282,7 @@ function cqpweb_startup_environment($flags = CQPWEB_STARTUP_NO_FLAGS, $run_locat
 
 	$User   = new CQPwebEnvUser( !($flags & CQPWEB_STARTUP_DONT_CHECK_USER) );
 	
-// 	if (is_null($specify_corpus_direct))
-// 		$Corpus = new CQPwebEnvCorpus();
-// 	else
-		$Corpus = new CQPwebEnvCorpus($specify_corpus_direct);
+	$Corpus = new CQPwebEnvCorpus($specify_corpus_direct);
 
 
 	/* now that we have the global $Corpus object, we can connect to CQP */

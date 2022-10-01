@@ -47,7 +47,11 @@
  */
 function show_var(&$var, $scope=false, $prefix='unique', $suffix='value')
 {
-///TODO make subjwect to print_debug_mnessage3s like squaewk is. 
+	global $Config;
+// 	if (!$Config->print_debug_messages)
+// 		return;
+	// TODO the above is actually a bit crap, cos it also prints all the SQL messages. 
+	
 	$vals = (is_array($scope) ? $scope : $GLOBALS);
 
 	$old = $var;
@@ -58,14 +62,9 @@ function show_var(&$var, $scope=false, $prefix='unique', $suffix='value')
 			$vname = $key;
 	$var = $old;
 
-
-global $Config;
-if ($Config->print_debug_messages)
-{
 	echo "\n<pre>-->\$$vname<--\n";
 	var_dump($var);
 	echo "</pre>";
-}
 }
 
 
@@ -297,8 +296,10 @@ function print_rss_icon_link()
  * Requires the metadata-embiggen javascript.
  * 
  * TODO should the other 2 embiggenable forms be in the html-lib as well?
+ * 
+ * TODO doesn't support multiple idlink tables on one screen.
  */
-function print_embiggenable_metadata_form($nrows = 5, $show_primary_classification = true, $form_id = NULL)
+function print_embiggenable_metadata_form($nrows = 5, $show_primary_classification = true, $form_id = NULL, $field_count_id = 'fieldCount')
 {
 	global $Config;
 	
@@ -363,12 +364,15 @@ END;
 
 	$n_of_cols = 4 + ($show_primary_classification ? 1 : 0);
 
+	$show_primary_classification_passthru = $show_primary_classification ? 'true' : 'false';
+	$form_id_passthru = empty($form_id) ? 'null' : "&quot;$form_id&quot;";
+	
 	$rows_html .= <<<END
 
 			<tr id="metadataEmbiggenRow">
 				<td colspan="$n_of_cols" class="concordgrey" align="center">
 					&nbsp;<br>
-					<a onClick="add_metadata_form_row()" class="menuItem">[Embiggen form]</a>
+					<a onClick="add_metadata_form_row('$field_count_id', $show_primary_classification_passthru, $form_id_passthru)" class="menuItem">[Embiggen form]</a>
 					<br>&nbsp;
 				</td>
 			</tr>
@@ -550,7 +554,7 @@ function print_html_footer($helplink = false)
 	<table class="concordtable fullwidth">
 		<tr>
 			<td align="left" class="cqpweb_copynote" width="33%">
-				CQPweb v$v &#169; 2008-2019
+				CQPweb v$v &#169; 2008-2021
 			</td>
 			<td align="center" class="cqpweb_copynote" width="33%">
 				$help_cell
@@ -694,7 +698,7 @@ class UiPageFramer
 	
 		?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 	<head>
 		<title><?php echo $this->title; ?></title>
 		<meta charset="UTF-8">
@@ -951,7 +955,7 @@ function print_html_header($title, $css_url = '', $js_scripts = array(), $extra_
 	if (isset($User) && $User->logged_in && $User->css_monochrome)
 		$css_url = $url_prefix . 'css/CQPweb-user-monochrome.css';
 	
-	$hdr = "<!DOCTYPE html>\n<html>\n<head>\n\t<meta charset=\"UTF-8\">\n"
+	$hdr = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n\t<meta charset=\"UTF-8\">\n"
 		. print_application_meta()
 		. "\t<title>$title</title>\n"
 		. (empty($css_url) ? '' : "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"$css_url\">\n");
@@ -1034,17 +1038,25 @@ function print_login_form($location_after = false)
 			$input_loc_after
 			<table class="basicbox" style="margin:auto">
 				<tr>
-					<td class="basicbox" width="170">Enter your username:</td>
+					<td class="basicbox" width="170">
+						<label for="username">Enter your username:</label>
+					</td>
 					<td class="basicbox" width="420">
-						<input type="text" name="username" maxlength="$uname_len" onKeyUp="check_c_word(this)">
+						<input type="text" id="username" name="username" maxlength="$uname_len" onKeyUp="check_c_word(this)">
 					</td>
 				</tr>
 				<tr>
-					<td class="basicbox">Enter your password:</td>
+					<td class="basicbox">
+						<label for="passwordTextInput">Enter your password:</label>
+					</td>
 					<td class="basicbox" nowrap>
-						<!-- maximum password length is 72 with the bcrypt algorithm -->
-						<p style="display:inline-block;"><input id="passwordTextInput" type="password" name="password" maxlength="72"></p>
-						<p id="capsLockHiddenPara" style="display:none"><strong>WARNING</strong>: Caps Lock seems to be on!</p>
+						<p style="display:inline-block;">
+							<!-- maximum password length is 72 with the bcrypt algorithm -->
+							<input id="passwordTextInput" type="password" name="password" maxlength="72">
+						</p>
+						<p id="capsLockHiddenPara" style="display:none">
+							<strong>WARNING</strong>: Caps Lock seems to be on!
+						</p>
 					</td>
 				</tr>
 				<tr>

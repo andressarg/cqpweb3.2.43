@@ -188,15 +188,14 @@ if ($context_size < $Corpus->initial_extended_context)
 $show_align = false;
 $align_info = check_alignment_permissions(list_corpus_alignments($Corpus->name));
 /* again note override: we do not allow BOTH translation viz AND parallel corpus viz */
-if (isset($_GET['showAlign'])&& ! $Corpus->visualise_translate_in_context)
+if (isset($_GET['showAlign']) &&! $Corpus->visualise_translate_in_context)
 {
 	if ( isset($align_info[$_GET['showAlign']]) )
 	{
 		$show_align = true;
 		$alignment_att_to_show = $_GET['showAlign'];
 		$alignment_corpus_info = get_corpus_info($alignment_att_to_show);
-		$aligned_corpus_has_primary_att 
-			= array_key_exists($Corpus->primary_annotation, list_corpus_annotations($alignment_att_to_show));
+		$aligned_corpus_has_primary_att = array_key_exists($Corpus->primary_annotation, list_corpus_annotations($alignment_att_to_show));
 	}
 }
 
@@ -443,31 +442,36 @@ if ($show_align)
 {
 	/* step specific to show-align mode... */
 	$kwic[1] = preg_replace("/^-->$alignment_att_to_show:\s/", '', $kwic[1]);
-
-	preg_match_all($word_extract_regex, trim($kwic[1]), $m, PREG_PATTERN_ORDER);
-	$alx = $m[4];
-	$xml_before_array = $m[1];
-	$xml_after_array  = $m[5];
-	$alxCount = (empty($alx[0]) ? 0 : count($alx));
-	$alx_string = '';
-	for ($i = 0; $i < $alxCount; $i++) 
+	if ('(no alignment found)' == $kwic[1])
+		$alx_string = $kwic[1];
+	else
 	{
-		/* apply XML visualisations */
-		$xml_before_string = apply_xml_visualisations($xml_before_array[$i], $xml_viz_index) . ' ';
-		$xml_after_string  =  ' ' . apply_xml_visualisations($xml_after_array[$i], $xml_viz_index);
-
-		list($word, $tag) = extract_cqp_word_and_tag($alx[$i], $Corpus->visualise_gloss_in_context, !$aligned_corpus_has_primary_att);
-
-// 		if ($use_alt_word_att)
-// 			$word = escape_html($alt_rc[$i]);
-// NB TODO have not checked how aligned mode might interact w/ show-parallel
-
-		$alx_string .= $xml_before_string . $word . ( $show_tags ? bdo_tags_on_tag($tag) : '' ) . $xml_after_string . ' ';
-
-		/* break line if this word is an end of sentence punctuation (And if the punctuation workaround is enabled) */
-		if ($Corpus->visualise_break_context_on_punc)
-			if (preg_match($line_breaker_regex, $word))
-				$alx_string .= $line_breaker;
+		preg_match_all($word_extract_regex, trim($kwic[1]), $m, PREG_PATTERN_ORDER);
+		$alx = $m[4];
+		$xml_before_array = $m[1];
+		$xml_after_array  = $m[5];
+		$alxCount = (empty($alx[0]) ? 0 : count($alx));
+		$alx_string = '';
+		for ($i = 0; $i < $alxCount; $i++) 
+		{
+			/* apply XML visualisations */
+	//TODO, check, did these spaces get removed in concordsance-lib? I have a vague memory that they were. 
+			$xml_before_string = apply_xml_visualisations($xml_before_array[$i], $xml_viz_index) . ' ';
+			$xml_after_string  =  ' ' . apply_xml_visualisations($xml_after_array[$i], $xml_viz_index);
+			
+			list($word, $tag) = extract_cqp_word_and_tag($alx[$i], $Corpus->visualise_gloss_in_context, !$aligned_corpus_has_primary_att);
+			
+	// 		if ($use_alt_word_att)
+	// 			$word = escape_html($alt_rc[$i]);
+	// NB TODO have not checked how alt mode might interact w/ show-parallel
+			
+			$alx_string .= $xml_before_string . $word . ( $show_tags ? bdo_tags_on_tag($tag) : '' ) . $xml_after_string . ' ';
+			
+			/* break line if this word is an end of sentence punctuation (And if the punctuation workaround is enabled) */
+			if ($Corpus->visualise_break_context_on_punc)
+				if (preg_match($line_breaker_regex, $word))
+					$alx_string .= $line_breaker;
+		}
 	}
 }
 
@@ -519,13 +523,13 @@ echo print_html_header("{$Corpus->title} -- CQPweb query extended context",
 	</tr>
 	<tr>
 		<td width="<?php echo ($fullwidth_colspan == 4 ? '25' : '50'); ?>%" align="center" class="concordgrey">
-			<form class="greyoutOnSubmit" id="contextMainDropdown" action="context.php" method="get" onsubmit="adjust_form_on_submit(event)">
+			<form class="autoAction greyoutOnSubmit" id="contextMainDropdown" action="redirect.php" method="get">
 				<input type="hidden" name="qname" value="<?php echo $qname; ?>">
 				<input type="hidden" name="batch" value="<?php echo $batch; ?>">
 				<input type="hidden" name="contextSize" value="<?php echo $context_size; ?>">
 				<input type="hidden" name="text" value="<?php echo $text_id; ?>">
 				<?php if ($show_tags) { ?><input type="hidden" name="showTags" value="1"><?php } echo "\n"; ?>
-				<?php if ($show_align) { ?><input type="hidden" name="showAlign " value="<?php echo $show_align; ?>"><?php } echo "\n"; ?>
+				<?php if ($show_align) { ?><input type="hidden" name="showAlign" value="<?php echo $alignment_att_to_show; ?>"><?php } echo "\n"; ?>
 
 				<?php 
 				if (!empty($Corpus->alt_context_word_att)) 
@@ -533,8 +537,9 @@ echo print_html_header("{$Corpus->title} -- CQPweb query extended context",
 				echo "\n";
 				?>
 
-				<select name="menuChoice">
-					<option value="textInfo" selected>
+				<select class="actionSelect" name="redirect">
+					<option selected disabled>Select action...</option>
+					<option value="fileInfo">
 						Text info for <?php echo $text_id; ?>
 					</option>
 					<?php
@@ -559,6 +564,7 @@ echo print_html_header("{$Corpus->title} -- CQPweb query extended context",
 
 		if (!empty($Corpus->primary_annotation))
 		{
+//TODO. This replicates a LOT of the other buttons...
 			/* and now, the "show tags" button */
 			?>
 
@@ -568,11 +574,9 @@ echo print_html_header("{$Corpus->title} -- CQPweb query extended context",
 					<input type="hidden" name="batch" value="<?php echo $batch; ?>">
 					<input type="hidden" name="contextSize" value="<?php echo $context_size; ?>">
 					<input type="hidden" name="showTags" value="<?php echo $tagshow_other_value; ?>">
-					<?php if ($show_align) { ?><input type="hidden" name="showAlign " value="<?php echo $show_align; ?>"><?php } echo "\n"; ?>
+					<?php if ($show_align) { ?><input type="hidden" name="showAlign" value="<?php echo $alignment_att_to_show; ?>"><?php } echo "\n"; ?>
 					<?php if (!empty($Corpus->alt_context_word_att)) { ?><input type="hidden" name="altview" value="<?php echo $altview_pass_value; ?>"><?php } echo "\n";	?>
-					&nbsp;
 					<input type="submit" value="<?php echo $tagshow_button_text; ?>">
-					&nbsp;
 					<?php echo url_printinputs(array(array('showTags', ""), ['batch',''], ['contextSize',''],  ['text',''],  ['qname',''], ['altview',''], ['showAlign',''])); ?>
 				</form>
 			</td>
@@ -593,11 +597,9 @@ echo print_html_header("{$Corpus->title} -- CQPweb query extended context",
 					<input type="hidden" name="batch" value="<?php echo $batch; ?>">
 					<input type="hidden" name="contextSize" value="<?php echo $context_size; ?>">
 					<input type="hidden" name="showTags" value="<?php echo $tagshow_present_value; ?>">
-					<?php if ($show_align) { ?><input type="hidden" name="showAlign " value="<?php echo $show_align; ?>"><?php } echo "\n"; ?>
+					<?php if ($show_align) { ?><input type="hidden" name="showAlign" value="<?php echo $alignment_att_to_show; ?>"><?php } echo "\n"; ?>
 					<input type="hidden" name="altview" value="<?php echo $altview_other_value; ?>">
-					&nbsp;
 					<input type="submit" value="<?php echo $altview_button_text; ?>">
-					&nbsp;
 					<?php echo url_printinputs(array(array('showTags', ""),['altview', ""], ['qname', ""],['batch', ""],['text',''], ['contextSize',''], ['showAlign',''],)); ?>
 				</form>
 			</td>

@@ -54,8 +54,8 @@ if (isset($_POST['redirect']) && empty($_GET['redirect']))
 if ( ! isset($_GET['redirect']))
 {
 	?>
-	
-	<html>
+<!DOCTYPE html>
+<html lang="en">
 	<head>
 		<title>Error!</title>
 	</head>
@@ -67,8 +67,7 @@ if ( ! isset($_GET['redirect']))
 			<a href="index.php">Please reload CQPweb</a>.
 		</pre>
 	</body>
-	</html>
-	
+</html>
 	<?php
 	exit();
 }
@@ -126,9 +125,9 @@ else
 		require("../lib/distribution-ui.php");
 		break;
 		
-	case 'Dispersion':
-	require("../lib/dispersion.php");
-	break;
+case 'Dispersion':
+require("../lib/dispersion.php");
+break;
 		
 
 	case 'sort':
@@ -146,7 +145,6 @@ else
 	case 'collocations':
 		require("../lib/colloc-options.inc.php");
 		break;
-
 
 	case 'download-conc':
 		require("../lib/download-conc.php");
@@ -176,19 +174,19 @@ else
 	/* from control box in context.php */
 	
 	case 'fileInfo':
-		require("../lib/textmeta.inc.php");
+		require("../lib/textmeta-ui.php");
 		break;
 		
 	case 'moreContext':
 		if (isset($_GET['contextSize']))
 			$_GET['contextSize'] += 100;
-		require("../lib/context.php");
+		require("../lib/context-ui.php");
 		break;
 		
 	case 'lessContext':
 		if (isset($_GET['contextSize']))
 			$_GET['contextSize'] -= 100;
-		require("../lib/context.php");
+		require("../lib/context-ui.php");
 		break;
 		
 	case 'backFromContext':
@@ -337,17 +335,18 @@ else
 
 	default:
 		?>
-		<html>
-		<head><title>Error!</title></head>
-		<body>
-			<pre>
-			
-			ERROR: Redirect type unrecognised.
-			
-			<a href="index.php">Please reload CQPweb</a>.
-			</pre>
-		</body>
-		</html>
+<!DOCTYPE html>
+<html lang="en">
+	<head><title>Error!</title></head>
+	<body>
+		<pre>
+		
+		ERROR: Redirect type unrecognised.
+		
+		<a href="index.php">Please reload CQPweb</a>.
+		</pre>
+	</body>
+</html>
 		<?php
 		break;
 	}

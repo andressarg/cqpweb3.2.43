@@ -51,32 +51,46 @@
  */
 function clog()
 {
+//	console.log(arguments);
 	for (var i = 0; i < arguments.length; i++)
 		console.log(arguments[i]);
 }
 
 
 ///* stop this from beign submitted, but re-enable in case of navigation back here. */
-// TODO use this instead of rep[eatig everytwherel.; 
 function disable_input_and_schedule_re_enable(form_node, input_name)
 {
-	var i = $(form_node).find('[name="' + input_name + '"]');
+	var i = $(form_node.elements).filter('[name="' + input_name + '"]');
 	i.prop("disabled", true);
 	$(window).on("pagehide", function () { i.prop("disabled", false); });
 }
 
+function enable_input(form_node, input_name)
+{
+	var i = $(form_node.elements).filter('[name="' + input_name + '"]');
+	i.prop("disabled", false);
+}
 
 
 function adjust_form_on_submit(e)
 {
+	/* jQ for the form the event lives on */
 	var form = $(e.target); 
-	var choice_selector = form.find('[name="menuChoice"]');
-	var menu_choice = choice_selector.val();
-//	
-//	/* stop this from beign submitted, but re-enable in case of navigation back here. */
-//	choice_selector.prop("disabled", true);
-//	$(window).on("pagehide", function () { choice_selector.prop("disabled", false); });
 	
+	/* jQ for the forms inputs, selects, etc. whetehr below it in the tree or not */
+	var inputs = $(e.target.elements);
+	
+	var choice_selector = inputs.filter('[name="menuChoice"]');
+	var menu_choice = choice_selector.val();
+	
+	/* set the dropdown back to its neutral, disabled option (the top one) */
+//	choice_selector[0].selectedIndex = 0;
+	choice_selector.prop("selectedIndex", 0);
+	
+	
+clog("menu choice is " + menu_choice);
+
+	/* stop this from being submitted, but re-enable in case of navigation back here. */
 	disable_input_and_schedule_re_enable(e.target, "menuChoice");
 
 	/* same everywhere */
@@ -90,43 +104,51 @@ function adjust_form_on_submit(e)
 	switch(e.target.id)
 	{
 	case 'contextMainDropdown':
+		
 		/* if "textInfo", change destination to textmeta.php; otherwise remove text input. */
 		if (menu_choice == 'textInfo')
 		{
 			e.preventDefault();
-			window.location.href = "textmeta.php?text="+ form.find('[name="text"]').val();
+			window.location.href = "textmeta.php?text="+ inputs.filter('[name="text"]').val();
 		}
 		else
 		{
-			form.find('[name="text"]').prop("disabled", true);
-			$(window).on("pagehide", function () { form.find('[name="text"]').prop("disabled", false); });
+// TODO use the func here!
+			disable_input_and_schedule_re_enable(e.target, "text");
+//			inputs.filter('[name="text"]').prop("disabled", true);
+//			$(window).on("pagehide", function () { inputs.filter('[name="text"]').prop("disabled", false); });
 		}
 
 		/* increase or decrease context */
 		if (menu_choice == 'moreContext' || menu_choice == 'lessContext')
 		{
-			var size = parseInt(form.find('[name="contextSize"]').val());
+			var size = parseInt(inputs.filter('[name="contextSize"]').val());
 			if (menu_choice == "moreContext")
 				size += 100;
 			if (menu_choice == "lessContext")
 				size -= 100;
-			form.find('[name="contextSize"]').val( size );
+			inputs.filter('[name="contextSize"]').val( size );
 		}
 
 		/* go back to the concordance */
 		if (menu_choice == 'backFromContext')
 		{
 			form.attr("action", "concordance.php");
-			form.find("input").not('[name="qname"]').remove();
+			inputs.not('[name="qname"]').remove();
 		}
+		
+		/* next stop: greyout_off && end of this function; at which point, submission is GO */
 
 		break;
 		/* end of actions for extended-context dropdown. */
 
 
 	case 'concordanceMainDropdown':
+		
 		/* majority of options need this, so always do it. */
 		e.preventDefault();
+		
+		var qname = inputs.filter('[name="qname"]').val() || "";
 
 		switch(menu_choice)
 		{
@@ -142,7 +164,8 @@ function adjust_form_on_submit(e)
 			break;
 		case 'dispersion':
 			// TODO set location to dispersion w/ parameters.
-			break;
+			window.location.href = "dispersion.php?qname=" + qname;
+			return false; /* for safety */
 		case 'sort':
 		//	$_GET['program'] = 'sort';
 		//	$_GET['newPostP'] = 'sort';
@@ -159,6 +182,7 @@ function adjust_form_on_submit(e)
 			//popup colloc form
 			greyout_and_popup_form("colloc-control");
 			break;
+			
 		case 'download-conc':
 			// set parameters, and then go to download-conc
 			break;
@@ -168,6 +192,7 @@ function adjust_form_on_submit(e)
 		//		$_GET['sqAction'] = 'enterCategories';
 			// set parameters in get, thne fo to savequery?sqAction=enterCategories
 			break;
+			
 		case 'categorise-do':
 			// set parameters, go to savequery-act
 			break;
@@ -191,10 +216,34 @@ function adjust_form_on_submit(e)
 		/* end of actions for main concordance dropdown. */
 
 
-//	case '':
-//	case '':
-	}
+	case 'dispersionMainDropdown':
+		
+		/* all options require the actual submission to blocked. */
+		e.preventDefault();
 
+		switch(menu_choice)
+		{
+		case "saveImg":
+			saveSvgAsPng(document.getElementById("svgOverview"), "dispersion-plot.png"); //todo let user customize it (choose name, background color, size)
+			enable_input(e.target, "menuChoice");
+			break;
+		
+		case "dispTable":
+			render_dispersion_measures_table_in_new_tab();
+			enable_input(e.target, "menuChoice");
+			break;
+		}
+
+		break;
+		/* end of actions for main dispersion dropdown. */
+		
+	}
+	/* end of switch that selects the actions by the form ID */
+
+	/* call greyout_and_throbber_off unconditionally; 
+	 * if we want to keep it on, we'll have returned above. */
+	greyout_and_throbber_off();
+	
 	return true;
 }
 
@@ -239,7 +288,7 @@ function redirect_form_by_input(e)
 			
 			/* Dump the redirect. */
 			
-			form.find('input[name="redirect"]').remove();
+			inputs.filter('input[name="redirect"]').remove();
 		}
 	}
 	
@@ -377,8 +426,9 @@ function greyout_and_throbber(msg)
 
 	g_content.appendTo($("#div_for_greyout"));
 
-//	window.onpagehide = function () { greyout_and_throbber_off(); }
-	$(window).on("pagehide", function () { greyout_and_throbber_off(); });
+
+//	$(window).on("pagehide", function () { greyout_and_throbber_off(); });
+	$(window).on("pagehide", greyout_and_throbber_off);
 }
 
 function greyout_and_throbber_off()
@@ -433,7 +483,7 @@ function greyout_and_acknowledge(msg, close_url)
 	if (undefined == close_url || null === close_url || '' === close_url || false === close_url)
 		l.click(function (e) {greyout_off(); e.stopImmediatePropagation(); $("#table_for_greyout_content").remove(); return false; });
 	else
-		l.click(function () {window.location.href = close_url; $("#table_for_greyout_content").remove(); return false; });
+		l.click(function () {$("#table_for_greyout_content").remove(); window.location.href = close_url; return false; });
 }
 
 
@@ -580,9 +630,8 @@ $( function() {
 
 // note - the following preloads the throbber gif, cos otherwise Firefox doesn't load on need. So, it should be only used if the user hasMozilla/ Gecko/ Firefox/. 
 $("body").append($('<img style="display:none;" src="../css/img/throbber.gif">'));
-// TODO integrate this a bit better... e.g. by looking in the data-store obvject for
-// throbber-preload. 
-
+// TODO integrate this a bit better... e.g. by looking in the data-store object for throbber-preload address
+// note that we need to use the correwct prefix to get it to work in user corpora, mainhome, etc. 
 	
 	/* apply bog-standard greyout and throbber to any form that has class greyoutOnSubmit */  
 	$("form.greyoutOnSubmit").submit(function () { greyout_and_throbber(); return true; });
@@ -595,15 +644,21 @@ $("body").append($('<img style="display:none;" src="../css/img/throbber.gif">'))
 	
 	/* put the redirector onto forms that declare they need it. */
 	$("form.hasRedirection").submit(redirect_form_by_input);
+	
+	/* put the "adjust on submit" capability onto auto-submit forms. */
+	$("form.autoSubmit").submit(adjust_form_on_submit);
+	
+	/* make selecting a choice in an "action selector" submit the form it belongs to. */
+	$("select.actionSelect").change( function (e) { $(e.target.form).submit(); } );
 
 	/*
 	 * This sets up all URL-type inputs to change to type text if an internal embedded page (ui=embed) is the content.
-	 * That makes these be allowed as URLs, even though browsers won;t recongnise them as URLs.
+	 * That makes these be allowed as URLs, even though browsers won't recognise them as URLs.
 	 */
 	 $("input[type=url]").keyup(
 		function (e)
 		{
-			if (/^index.php\?ui=embed&id=\d+$/.test(e.target.value))
+			if (/^(\.\.\/exe\/)?index.php\?ui=embed&id=\d+$/.test(e.target.value))
 				e.target.type = "text" ; 
 			else
 				e.target.type = "url" ;

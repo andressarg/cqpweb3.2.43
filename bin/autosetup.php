@@ -34,7 +34,6 @@ require('../lib/environment.php');
 /* include function library files */
 require('../lib/general-lib.php');
 require('../lib/sql-lib.php');
-require('../lib/admin-lib.php');
 require('../lib/sql-definitions.php');
 require('../lib/useracct-lib.php');
 require('../lib/exiterror-lib.php');

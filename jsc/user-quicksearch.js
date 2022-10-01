@@ -29,7 +29,8 @@ function do_username_chooser_insertion(uname, dest)
 	$("#"+dest).val(uname);
 	$(".userQuicksearchResults").detach().empty();
 alert("setting " + dest + " to " +uname);
-return false;}
+return false;
+}
 
 
 /**
@@ -114,7 +115,7 @@ console.log(e.keyCode);
 							
 							case 'insert':
 								ref.results.append(
-										'<li><a id=""tabindex="' 
+										'<li><a id="" tabindex="' 
 										+ (ref.tabix+(++n)) 
 										+ '" onclick="do_username_chooser_insertion(\'' 
 										+ ref.usernames[j] 
@@ -129,7 +130,7 @@ console.log(e.keyCode);
 						}
 					}
 					
-					/* fire the insert function if there is only one name and soemone presses enter. */ 
+					/* fire the insert function if there is only one name and someone presses enter. */ 
 					if ('insert' == ref.task && e.keyCode == 0x0d && !e.shiftKey )
 					{
 //						do_username_chooser_insertion(ref.usernames[0], e.target.id);
@@ -142,7 +143,8 @@ console.log(e.keyCode);
 					ref.results.appendTo(ref.anchor);
 					var coord = get_element_bottom_left_corner_coords(ref.node[0]);
 					ref.results.css( 'left', 5 + coord[0] + ref.node.width() );
-					ref.results.css( 'top',  coord[1] - ( 3 * ref.results.height()/4)  );
+					var h = coord[1] - ( 3 * ref.results.height()/4);
+					ref.results.css( 'top', (h > 0 ? h : 0)  );
 					
 				}
 				else

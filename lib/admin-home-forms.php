@@ -2465,12 +2465,13 @@ function do_adm_ui_userview()
 			</td>
 			<td class="concordgeneral" colspan="2">
 				&nbsp;<br>
-				<a class="menuItem" href="index.php?ui=userDelete&checkUserDelete=<?php 
+				<a class="menuItem" href="index.php?<?php 
 
+				/* direct delete for unverified accounts; otherwise, the are-you-sure page */
 				if (USER_STATUS_UNVERIFIED == $user->acct_status)
-					echo "index.php?admF=execute&function=delete_unverified_user&args={$user->username}&locationAfter=" . urlencode('index.php?ui=userAdmin');
+					echo "admF=execute&function=delete_unverified_user&args={$user->username}&locationAfter=" . urlencode('index.php?ui=userAdmin');
 				else
-					echo "index.php?ui=userDelete&checkUserDelete={$user->username}";
+					echo "ui=userDelete&checkUserDelete={$user->username}";
 
 				?>">
 					[Click here to totally delete this user's account from the system]
@@ -5638,7 +5639,7 @@ function do_adm_ui_statistic($type = 'user')
 	$navlinks .= '</td><td class="basicbox" align="right';
 	
 	if (mysqli_num_rows($result) > $i)
-		$navlinks .=  '"><a href="index.php?' . url_printget(array(array('beginAt', "$i + 1")));
+		$navlinks .=  '"><a href="index.php?' . url_printget(array( ['beginAt', "$i + 1"], ['ui',''] ));
 	$navlinks .= '">[Move down the list] &gt;&gt;';
 	if (mysqli_num_rows($result) > $i)
 		$navlinks .= '</a>';
@@ -5884,7 +5885,8 @@ function do_adm_ui_opcodecache()
 				<p>
 					Opcode caches are tools to speed up PHP applications like CQPweb. Several different ones are available,
 					but any individual server will only use <i>one</i>. 
-					<strong>OPcache</strong>, <strong>APC</strong>,  and <strong>WinCache</strong> are three opcode caches that can be monitored from within CQPweb.
+					<strong>OPcache</strong>, <strong>APC</strong>,  and <strong>WinCache</strong> are three opcode caches 
+					that can be monitored from within CQPweb.
 				</p>
 				<?php
 				echo '<ul>'
@@ -5934,21 +5936,21 @@ function do_adm_ui_opcodecache()
 			$info = apc_cache_info();
 			$rawinfo = $info['cache_list'];
 			$fnkey = 'filename';
-			$func_date_timestamp = create_function('$x', 'return $x["creation_time"];');
+			$func_date_timestamp = function ($x) {return $x["creation_time"];};
 			$hitkey = 'num_hits';
 			break;
 		case 'opcache':
 			$info = opcache_get_status(true);
 			$rawinfo = $info['scripts'];
 			$fnkey = 'full_path';
-			$func_date_timestamp = create_function('$x', 'return $x["timestamp"];');
+			$func_date_timestamp = function ($x) {return $x["timestamp"];};
 			$hitkey = 'hits';
 			break;
 		case 'wincache':
 			$info = wincache_ocache_fileinfo(false);
 			$rawinfo = $info['file_entries'];
 			$fnkey = 'file_name';
-			$func_date_timestamp = create_function('$x', 'return (time() - $x["add_time"]);');
+			$func_date_timestamp = function($x) {return (time() - $x["add_time"]);};
 			$hitkey = 'hit_count';
 			break;
 		}
@@ -5970,6 +5972,7 @@ function do_adm_ui_opcodecache()
 		$loc = '&locationAfter=' . urlencode('index.php?ui=opcodeCache');
 		
 		?>
+		
 		<table class="concordtable fullwidth">
 			<tr>
 				<th class="concordtable" colspan="4">
@@ -6025,6 +6028,7 @@ function do_adm_ui_opcodecache()
 				<th class="concordtable">Times reused</th>
 				<th class="concordtable">Actions</th>
 			</tr>
+			
 			<?php
 			
 			$chop_off = realpath('../lib/'). '/';
@@ -6056,7 +6060,9 @@ function do_adm_ui_opcodecache()
 				echo "</tr>\n";
 			}
 			?>
+
 		</table>
+		
 		<?php
 	}
 }

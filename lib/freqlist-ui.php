@@ -256,32 +256,32 @@ $limit_string = ($download_mode ? '' : ("LIMIT ". ($page_no-1) * $per_page . ', 
 
 
 
-
-
 /* now there are two more parameters to process */
 
 /* the table to use (basename) */
 
-if ( !isset($_GET['flTable']) || $_GET['flTable'] == '__entire_corpus' )
+if ( ($_GET['flTable'] ?? '__entire_corpus') == '__entire_corpus' )
 {
 	$table_base = "freq_corpus_{$Corpus->name}";
 	$table_desc = "entire &ldquo;" . escape_html($Corpus->title) . "&rdquo;";
-	$param_hash['flTable'] = $_GET['flTable'];
+	$param_hash['flTable'] = '__entire_corpus';
 }
 else
 {
 	if (false === ($subcorpus = Subcorpus::new_from_id($_GET['flTable'])))
 		exiterror("Cannot find the specified subcorpus.");
+	if (!$subcorpus->has_freqtable())
+		exiterror("The specified subcorpus has no frequency table (hint: compile it under ''Create/edit subcorpora''.");
 	
 	$freqtable_record = $subcorpus->get_freqtable_record();
 	touch_freqtable($freqtable_record->freqtable_name);
-	$table_base = $freqtable_record->freqtable_name;
+	$table_base = $freqtable_record->freqtable_name; // TODO 3.3 this is a possible fail point for new, rationalised tablenames.  
 	$table_desc = "subcorpus &ldquo;{$subcorpus->name}&rdquo;";
 	$param_hash['flTable'] = $subcorpus->id;
 }
 
 /* create a restriction string to go in any queries that are created */
-$restrict_string = (isset($subcorpus) ? '&del=begin&t=~sc~'. $subcorpus->id . '&del=end' : '');
+$restrict_url_fragment = (isset($subcorpus) ? '&del=begin&t=~sc~'. $subcorpus->id . '&del=end' : '');
 
 
 /* check the attribute setting is valid */
@@ -290,10 +290,10 @@ $att_desc = list_corpus_annotations($Corpus->name);
 $att_desc['word'] = 'Word';
 
 /* if the script has been fed an attribute that doesn't exist for this corpus, failsafe to 'word' */
-if (! array_key_exists($att, $att_desc) )
+if (!isset($att_desc[$att]))
 	$att = 'word';
 
-$freqtable = "{$table_base}_$att";
+$freqtable = "{$table_base}_$att";// TODO 3.3 this is a possible fail point for new, rationalised tablenames.  
 
 
 
@@ -311,9 +311,9 @@ else
 	$grand_where = "where $filter_clause and $range_clause";
 
 $sql = "SELECT item, freq from $freqtable 
-	$grand_where
-	$order_by_clause
-	$limit_string";
+			$grand_where
+			$order_by_clause
+			$limit_string";
 
 /* and run it */
 $result = do_sql_query($sql);
@@ -321,11 +321,6 @@ $result = do_sql_query($sql);
 /* get number of tokens for AntConc-style downloads */
 if ($download_mode)
 	$sum_tokens = get_sql_value(str_replace('SELECT item, freq', 'SELECT sum(freq)', $sql));
-// {
-// 	$sum_sql = str_replace('SELECT item, freq', 'SELECT sum(freq)', $sql);
-// 	$sum_result = do_sql_query($sum_sql);
-// 	list($sum_tokens) = mysqli_fetch_row($sum_result);
-// }
 
 $n_key_items = mysqli_num_rows($result);
 
@@ -395,7 +390,7 @@ else
 		for ( $i = 0 ; $i < $n_key_items ; $i++ )
 		{
 			$o = mysqli_fetch_object($result);
-			echo "\n\t<tr>\n\t\t", print_freqlist_line($o, ($begin_at + $i), $att, $restrict_string), "\n\t</tr>\n";
+			echo "\n\t<tr>\n\t\t", print_freqlist_line($o, ($begin_at + $i), $att, $restrict_url_fragment), "\n\t</tr>\n";
 		}
 		
 		?>

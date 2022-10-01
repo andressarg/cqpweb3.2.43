@@ -37,18 +37,21 @@
  * Builds and returns an HTML string containing the search-box and associated UI elements 
  * used in the Standard and Restricted Query forms. 
  * 
+ * @param  string $form_id                 ID of the form these inputs will be inserted into.
  * @param  string $qstring                 A search pattern that will be inserted into the query textbox Or an empty value.
  * @param  string $qmode                   The query-mode to pre-set in the query control. Or an empty value.
- * @param  string $qsubcorpus              String: preset subcorpus. Only works if $show_mini_restrictions is true. 
+ * @param  int    $qsubcorpus              Integer ID of pre-selected subcorpus. Only works if $show_mini_restrictions is true. 
  * @param  bool   $show_mini_restrictions  Set to true if you want the "simple restriction" control for Standard Query.
  * @return string                          The assembled HTML.
  */
-function print_search_box($qstring, $qmode, $qsubcorpus, $show_mini_restrictions)
+function print_search_box($form_id, $qstring, $qmode, $qsubcorpus, $show_mini_restrictions)
 {
 	global $Config;
 	global $Corpus;
 	global $User;
 	
+	/* GET VARIABLES READY: form attribute, if needed */
+	$form_att = empty($form_id) ? '' : " form=\"$form_id\"";
 	
 	/* GET VARIABLES READY: contents of query box */
 	$qstring = ( ! empty($qstring) ? escape_html(prepare_query_string($qstring)) : '' );
@@ -69,17 +72,12 @@ function print_search_box($qstring, $qmode, $qsubcorpus, $show_mini_restrictions
 	
 
 	/* GET VARIABLES READY: the query mode. */
-	$modemap = array(
-		'cqp'       => 'CQP syntax',
-		'sq_nocase' => 'Simple query (ignore case)',
-		'sq_case'   => 'Simple query (case-sensitive)',
-		);
-	if (! array_key_exists($qmode, $modemap) )
+	if (! array_key_exists($qmode, $Config->query_mode_map) )
 		$qmode = ($Corpus->uses_case_sensitivity ? 'sq_case' : 'sq_nocase');
 		/* includes NULL, empty */
 	
 	$mode_options = '';
-	foreach ($modemap as $mode => $modedesc)
+	foreach ($Config->query_mode_map as $mode => $modedesc)
 		$mode_options .= "\n\t\t\t\t\t\t\t<option value=\"$mode\"" . ($qmode == $mode ? ' selected' : '') . ">$modedesc</option>";
 
 	
@@ -139,8 +137,8 @@ function print_search_box($qstring, $qmode, $qsubcorpus, $show_mini_restrictions
 				<tr>
 					<td class="basicbox">Display alignment:</td>
 					<td class="basicbox">
-						<select name="showAlign">
-							<option selected>Do not show aligned text in parallel corpus</option>
+						<select$form_att name="showAlign">
+							<option value="~~none" selected>Do not show aligned text in parallel corpus</option>
 							$align_options
 						</select>
 					</td>
@@ -168,7 +166,7 @@ END_PARALLEL_ROW;
 				<tr>
 					<td class="basicbox">Match strategy:</td>
 					<td class="basicbox">
-						<select name="qstrategy">
+						<select$form_att name="qstrategy">
 							<option value="0"$select_standard>Standard</option>
 							<!-- Note that because "standard" is normal, we do not actually want
 							     to use a flag for it (or all queries would end up with a modifier!) -->
@@ -181,60 +179,17 @@ END_PARALLEL_ROW;
 	
 END_STRATEGY_ROW;
 	}
+		
+	
+
+
+	
 
 	/* ASSEMBLE THE RESTRICTIONS MINI-CONTROL TOOL */
-	if ( ! $show_mini_restrictions)
-		$restrictions_html = '';
+	if ($show_mini_restrictions)
+		$restriction_dropdown = print_mini_restriction_search_tool($form_id, $qsubcorpus);
 	else
-	{
-		/* create options for the Primary Classification */
-		/* first option is always whole corpus */
-		$restrict_options = "\n\t\t\t\t\t\t\t<option value=\"\"" 
-			. ( empty($qsubcorpus) ? ' selected' : '' )
-			. '>None (search whole corpus)</option>'
-			;
-		
-		$field = $Corpus->primary_classification_field;
-		foreach (list_text_metadata_category_descriptions($Corpus->name, $field) as $h => $c)
-			$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"-|$field~$h\">".(empty($c) ? $h : escape_html($c))."</option>";
-		
-		/* list the user's subcorpora for this corpus, including the last set of restrictions used */
-		
-		$result = do_sql_query("select * from saved_subcorpora where corpus = '{$Corpus->name}' and user = '{$User->username}' order by name");
-		
-		while (false !== ($sc = Subcorpus::new_from_db_result($result)))
-		{
-			if ($sc->name == '--last_restrictions')
-				$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"--last_restrictions\">Last restrictions ("
-					. $sc->print_size_tokens() . ' words in ' 
-					. $sc->print_size_items()  . ')</option>'
-					;
-			else
-				$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"~sc~{$sc->id}\""
-					. ($qsubcorpus == $sc->id ? ' selected' : '')
-					. '>Subcorpus: ' . $sc->name . ' ('
-					. $sc->print_size_tokens() . ' words in ' 
-					. $sc->print_size_items()  . ')</option>'
-					;
-		}
-		
-		/* we now have all the subcorpus/restrictions options, so assemble the HTML */
-		$restrictions_html = <<<END_RESTRICT_ROW
-
-				<tr>
-					<td class="basicbox">Restriction:</td>
-					<input type="hidden" name="del" size="-1" value="begin">
-					<td class="basicbox">
-						<select name="t">
-							$restrict_options
-						</select>
-					</td>
-				</tr>
-				<input type="hidden" name="del" size="-1" value="end">
-
-END_RESTRICT_ROW;
-
-	} /* end of $show_mini_restrictions is true */
+		$restriction_dropdown = '';
 
 
 	/* ALL DONE: so assemble the HTML from the above variables && return it. */
@@ -244,7 +199,8 @@ END_RESTRICT_ROW;
 
 			&nbsp;<br>
 
-			<textarea 
+			<textarea
+				$form_att
 				id="searchBox"
 				name="theData" 
 				rows="5" 
@@ -263,7 +219,7 @@ END_RESTRICT_ROW;
 					<td class="basicbox">Query mode:</td>
 
 					<td class="basicbox">
-						<select id="qmode" name="qmode" $mode_js>
+						<select$form_att id="qmode" name="qmode" $mode_js>
 							$mode_options
 						</select>
 						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -277,7 +233,7 @@ END_RESTRICT_ROW;
 				<tr>
 					<td class="basicbox">Number of hits per page:</td>
 					<td class="basicbox">
-						<select name="pp">
+						<select$form_att name="pp">
 							<option value="count">count hits</option>
 
 							$pp_options
@@ -293,14 +249,19 @@ END_RESTRICT_ROW;
 				$strategy_html
 
 
-				$restrictions_html
 
+				<tr>
+					<td class="basicbox">Restriction:</td>
+					<td class="basicbox">
+						$restriction_dropdown
+					</td>
+				</tr>
 
 				<tr>
 					<td class="basicbox">&nbsp;</td>
 					<td class="basicbox">
-						<input type="submit" value="Start Query">
-						<input type="reset" value="Reset Query">
+						<input$form_att type="submit" value="Start Query">
+						<input$form_att type="reset" value="Reset Query">
 					</td>
 				</tr>
 			</table>
@@ -350,6 +311,119 @@ END_OF_HTML;
 }
 
 
+/**
+ * Builds and returns an HTML string containing a short, compressed run-a-query form
+ * with many options from the main Standard/Restricted query missing. 
+ * 
+ * @param  string $form_id       ID to give to the form.
+ * @param  string $qsubcorpus    Integer ID of pre-selected subcorpus. 
+ * @return string                The assembled HTML (sequence of 3 td's).
+ */
+function print_mini_search_box($form_id = '', $qsubcorpus = NULL)
+{
+	global $Config;
+	global $Corpus;
+// qsubcorpus: might we want to have all new queries run in a particular subcorpus/restruicitonm?
+
+	/* GET VARIABLES READY: the query mode. */
+	$qmode = ($Corpus->uses_case_sensitivity ? 'sq_case' : 'sq_nocase');
+
+	$mode_options = '';
+	foreach ($Config->query_mode_map as $mode => $modedesc)
+		$mode_options .= "\n\t\t\t\t\t\t\t<option value=\"$mode\"" . ($qmode == $mode ? ' selected' : '') . ">$modedesc</option>";
+
+	/* ASSEMBLE THE RESTRICTIONS MINI-CONTROL TOOL */
+	$restriction_dropdown = print_mini_restriction_search_tool($form_id, $qsubcorpus);
+
+	$id_att   = empty($form_id) ? '' : " id=\"$form_id\"";
+	$form_att = empty($form_id) ? '' : " form=\"$form_id\"";
+
+	return <<<END_OF_HTML
+		
+			<td class="concordgeneral">
+				<form$id_att></form>
+				<input$form_att type="submit" value="Run Query">
+				<input$form_att type="text" name="theData" placeholder="Enter query">
+			</td>
+			<td class="concordgeneral">
+				Query mode:
+				<select$form_att name="qmode">
+					$mode_options
+				</select>
+			</td>
+			<td class="concordgeneral">
+				Restriction:
+				$restriction_dropdown
+			</td>
+
+END_OF_HTML;
+
+}
+
+
+
+
+/**
+ * Create the HTML for a "restriction" dropdown in a search form.
+ * 
+ * @param  string $form_id                  ID of form these will be added to.
+ * @param  int    $subcorpus_to_preselect   Integer subcorpus ID; if specified, 
+ *                                          that subcorpus will be preselected. 
+ * @return string                           HTML of the mini restriction dropdown.
+ */
+function print_mini_restriction_search_tool($form_id = '', $subcorpus_to_preselect = NULL)
+{
+	global $Corpus;
+	global $User;
+	
+	/* create options for the Primary Classification */
+	/* first option is always whole corpus */
+	$restrict_options = "\n\t\t\t\t\t\t\t<option value=\"\"" 
+		. ( is_null($subcorpus_to_preselect) ? ' selected' : '' )
+		. '>None (search whole corpus)</option>'
+		;
+		
+	$field = $Corpus->primary_classification_field;
+	foreach (list_text_metadata_category_descriptions($Corpus->name, $field) as $h => $c)
+		$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"-|$field~$h\">".(empty($c) ? $h : escape_html($c))."</option>";
+	
+	/* list the user's subcorpora for this corpus, including the last set of restrictions used */
+	
+	$result = do_sql_query("select * from saved_subcorpora where corpus = '{$Corpus->name}' and user = '{$User->username}' order by name");
+	
+	while ($sc = Subcorpus::new_from_db_result($result))
+		if ($sc->name == '--last_restrictions')
+			$restrict_options .= "<option value=\"--last_restrictions\">Last restrictions ("
+				. $sc->print_size_tokens() . ' words in ' 
+				. $sc->print_size_items()  . ')</option>'
+				;
+		else
+			$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"~sc~{$sc->id}\""
+				. ($subcorpus_to_preselect == $sc->id ? ' selected' : '')
+				. '>Subcorpus: ' . $sc->name . ' ('
+				. $sc->print_size_tokens() . ' words in ' 
+				. $sc->print_size_items()  . ')</option>'
+				;
+	
+	/* we now have all the subcorpus/restrictions options, so assemble the HTML */
+	
+	$form_att = empty($form_id) ? '' : " form=\"$form_id\"";
+	
+	return <<<END_RESTRICT_DROPDOWN
+
+					<input$form_att type="hidden" name="del" size="-1" value="begin">
+					<select$form_att name="t">
+						$restrict_options
+					</select>
+					<input$form_att type="hidden" name="del" size="-1" value="end">
+
+END_RESTRICT_DROPDOWN;
+
+}
+
+
+
+
 
 function do_ui_search()
 {
@@ -371,6 +445,7 @@ function do_ui_search()
 	
 					<?php
 					echo print_search_box(
+						NULL,
 						isset($_GET['insertString'])    ? $_GET['insertString']    : NULL,
 						isset($_GET['insertType'])      ? $_GET['insertType']      : NULL,
 						isset($_GET['insertSubcorpus']) ? $_GET['insertSubcorpus'] : NULL,
@@ -424,6 +499,7 @@ function do_ui_restricted()
 
 					<?php
 					echo print_search_box(
+						NULL,
 						isset($_GET['insertString']) ? $_GET['insertString']  : NULL,
 						isset($_GET['insertType'])   ? $_GET['insertType']    : NULL,
 						NULL,
@@ -486,7 +562,7 @@ function print_restriction_block($insert_restriction, $thing_to_produce, $form_i
 	foreach ($classifications as $c_handle => $c_desc)
 	{
 		$header_row[$i] = '<td width="33%" class="concordgrey" align="center">' .escape_html($c_desc) . '</td>';
-		$body_row[$i] = '<td class="concordgeneral" valign="top" nowrap="nowrap">';
+		$body_row[$i] = '<td class="concordgeneral" valign="top" nowrap>';
 
 		$catlist = list_text_metadata_category_descriptions($Corpus->name, $c_handle);
 
@@ -590,7 +666,7 @@ END_HTML;
 		foreach($class_atts as $c)
 		{
 			$header_row[$i] = '<td width="33%" class="concordgrey" align="center">' . $xml[$c]->description . '</td>';
-			$body_row[$i] = '<td class="concordgeneral" valign="top" nowrap="nowrap">';
+			$body_row[$i] = '<td class="concordgeneral" valign="top" nowrap>';
 
 			$catlist = xml_category_listdescs($Corpus->name, $c);
 
@@ -598,10 +674,12 @@ END_HTML;
 
 			foreach ($catlist as $handle => $desc)
 			{
+				$input_id = 'RXC: ' . $el . ':' . $t_base_c . ':' . $handle;
 				$t_value = $el . '|'. $t_base_c . '~' . $handle;
 				$check = ( ( $insert_restriction && $insert_restriction->form_t_value_is_activated($t_value) ) ? 'checked ' : '');
-				$body_row[$i] .= '<input' . $fid_string . ' type="checkbox" name="t" value="' . $t_value . '" ' . $check 
-					. '> ' . ($desc == '' ? $handle : escape_html($desc)) . '<br>';
+				$body_row[$i] .= 
+					"\n<input$fid_string id=\"$input_id\"" . ' type="checkbox" name="t" value="' . $t_value . '" ' . $check 
+					. '> <label for="' . $input_id . '">' . ($desc == '' ? $handle : escape_html($desc)) . '</label><br>';
 			}
 
 			/* whitespace is gratuitous for readability */
@@ -637,6 +715,8 @@ END_HTML;
 			';
 		}
 	}
+	
+	//TODO we also need xml-within. RXW for XML within IDs!
 
 	//TODO
 	// a lot of stuff is now repeated 3 times, for text metadata, xml classification, and idlink classifications. Look at factoring some of it out. 
@@ -661,7 +741,7 @@ END_HTML;
 		foreach ($idlink_classifications as $field_h => $field_o)
 		{
 			$header_row[$i] = '<td width="33%" class="concordgrey" align="center">' . $field_o->description . '</td>';
-			$body_row[$i] = '<td class="concordgeneral" valign="top" nowrap="nowrap">';
+			$body_row[$i] = '<td class="concordgeneral" valign="top" nowrap>';
 
 			$catlist = idlink_category_listdescs($Corpus->name, $field_o->att_handle, $field_h);
 
@@ -669,10 +749,12 @@ END_HTML;
 
 			foreach ($catlist as $handle => $desc)
 			{
+				$input_id = 'RID: ' . $el . ':' . $field_h . ':' . $handle;
 				$t_value = $xml[$el]->att_family . '|'. $t_base . '~' . $handle;
 				$check = ( ( $insert_restriction && $insert_restriction->form_t_value_is_activated($t_value) ) ? 'checked ' : '');
-				$body_row[$i] .= '<input' .$fid_string . ' type="checkbox" name="t" value="' . $t_value . '" ' . $check 
-					. '> ' . ($desc == '' ? $handle : escape_html($desc)) . '<br>';
+				$body_row[$i] .= 
+					"\n<input$fid_string id=\"$input_id\"" . ' type="checkbox" name="t" value="' . $t_value . '" ' . $check 
+					. '> <label for="' . $input_id . '">'  . ($desc == '' ? $handle : escape_html($desc)) . '</label><br>';
 			}
 
 			/* whitespace is gratuitous for readability */
@@ -1561,7 +1643,7 @@ function do_ui_export()
 
 	?>
 	
-	<form action="export-corpus.php" method="get">
+	<form class="greyoutOnSubmit" action="export-corpus.php" method="get">
 		<table class="concordtable fullwidth">
 			<tr>
 				<th colspan="2" class="concordtable">Export corpus or subcorpus</th>
@@ -1692,103 +1774,4 @@ function do_ui_export()
 	<?php
 }
 
-//voltaraqui
-// coloquei tudo abaixo
 
-/**
- * Builds and returns an HTML string containing a short, compressed run-a-query form
- * with many options from the main Standard/Restricted query missing. 
- * 
- * @param  string $form_id       ID to give to the form (defaults to 'miniSearchBoxForm').
- * @param  string $qsubcorpus    Integer ID of pre-selected subcorpus (as string).
- * @return string                The assembled HTML (sequence of 3 td's).
- */
-function print_mini_search_box(string $form_id = 'miniSearchBoxForm', ?string $qsubcorpus = null) : string
-{
-	global $Corpus;
-// qsubcorpus: might we want to have all new queries run in a particular subcorpus/restruicitonm? (becasue this is used by dispersion)
-	
-	/* do we have a form ID specified? */
-	$id_att   = " id=\"$form_id\"";
-	$form_att = " form=\"$form_id\"";
-	
-	/* GET VARIABLES READY: the query mode. */
-	// $qmode = ($Corpus->case_sensitive ? 'sq_case' : 'sq_nocase');
-	$qmode = ($Corpus->uses_case_sensitivity ? 'sq_case' : 'sq_nocase');
-	$mode_options = '';
-	foreach ('DESCRIBE_QUERY_MODE' as $mode => $modedesc)
-		$mode_options .= "\n\t\t\t\t\t\t\t<option value=\"$mode\"" . ($qmode == $mode ? ' selected' : '') . ">$modedesc</option>";
-	
-	/* ASSEMBLE THE RESTRICTIONS MINI-CONTROL TOOL */
-	$restriction_dropdown = print_mini_restriction_search_tool($form_id, $qsubcorpus);
-	
-	return <<<END_OF_HTML
-	
-				<td class="layout-fg">
-					<form$id_att></form>
-					<button$form_att type="submit">Run query</button>
-					<input$form_att type="text" name="qdata" placeholder="Enter query">
-				</td>
-				<td class="layout-fg">
-					Query mode:
-					<select$form_att name="qmode">
-						$mode_options
-					</select>
-				</td>
-				<td class="layout-fg">
-					Restriction:
-					$restriction_dropdown
-				</td>
-	
-END_OF_HTML;
-}
-
-/**
- * Create the HTML for a "restriction" dropdown in a search form.
- * 
- * @param  string $form_id                  ID of form these will be added to.
- * @param  int    $subcorpus_to_preselect   Integer subcorpus ID; if specified,
- *                                          that subcorpus will be preselected.
- * @return string                           HTML of the mini restriction dropdown (hidden input delimiters around a select).
- */
-function print_mini_restriction_search_tool(string $form_id = '', ?int $subcorpus_to_preselect = null) : string
-{
-	global $Corpus;
-	global $User;
-	
-	$form_att = empty($form_id) ? '' : " form=\"$form_id\"";
-	
-	/* create options for the Primary Classification */
-	
-	/* first option is always whole corpus */
-	$restrict_options = "\n\t\t\t\t\t\t\t<option value=\"\"" . ( is_null($subcorpus_to_preselect) ? ' selected' : '' ) . '>None (search whole corpus)</option>' ;
-	if ($field = $Corpus->primary_classification_field)
-		foreach (list_text_metadata_categories_as_desc_map($Corpus->handle, $field) as $h => $c)
-			$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"-|$field~$h\">".(empty($c) ? $h : escape_html($c))."</option>";
-	
-	/* list the user's subcorpora for this corpus, including the last set of restrictions used */
-	$result = do_sql_query("select * from saved_subcorpora where corpus_id = {$Corpus->id} and user_id = {$User->id} order by savename");
-	while ($sc = Subcorpus::new_from_db_result($result))
-		if ($sc->savename == '--last_restrictions')
-			$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"--last_restrictions\">Last restrictions ("
-				. $sc->print_size_tokens() . ' words in ' 
-				. $sc->print_size_items()  . ')</option>'
-				;
-		else
-			$restrict_options .= "\n\t\t\t\t\t\t\t<option value=\"~sc~{$sc->id}\""
-				. ($subcorpus_to_preselect == $sc->id ? ' selected' : '')
-				. '>Subcorpus: ' . $sc->savename . ' ('
-				. $sc->print_size_tokens() . ' words in ' 
-				. $sc->print_size_items()  . ')</option>'
-				;
-	
-	/* we now have all the subcorpus/restrictions options, so assemble the HTML */
-	return <<<END_RESTRICT_DROPDOWN
-	
-							<select$form_att name="t">
-								$restrict_options
-							</select>
-	
-END_RESTRICT_DROPDOWN;
-	/* note above - no t-ticker, because this form only has one t. */
-}

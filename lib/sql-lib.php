@@ -117,11 +117,7 @@ function get_sql_cqpwebdb_version()
 	return get_sql_value('select value from system_info where setting_name = "db_version"');
 }
 
-// stub function ; remove in due course. 
-function get_cqpweb_db_version()
-{
-	return get_sql_cqpwebdb_version();
-}
+
 
 
 /* 
@@ -364,7 +360,7 @@ function do_sql_infile_query($table, $filepath, $no_escapes = true)
 		 * types, because those are the ones CQPweb uses. There are, of course,
 		 * others. See the MySQL manual. */
 		
-		$result = do_sql_query("describe $table");
+		$result = do_sql_query("describe `$table`");
 		
 		while ($f = mysqli_fetch_object($result))
 		{
@@ -387,12 +383,11 @@ function do_sql_infile_query($table, $filepath, $no_escapes = true)
 		/* loop across lines in input file */
 		while (false !== ($line = fgets($source)))
 		{
-			/* necessary for security, but might possibly lead to data being
-			 * escaped where we don't want it; if so, tant pis */
-			$line = mysqli_real_escape_string($line);
-			$line = rtrim($line, "\r\n");
-			$data = explode("\t", $line);
-
+			// escaping is now done per-value.
+//			/* necessary for security, but might possibly lead to data being
+//			 * escaped where we don't want it; if so, tant pis */
+//			$line = escape_sql($line);
+			$data = explode("\t", rtrim($line, "\r\n"));
 			
 			$blob1 = $blob2 = '';
 			
@@ -401,7 +396,7 @@ function do_sql_infile_query($table, $filepath, $no_escapes = true)
 				/* require both a field and data; otherwise break */
 				if (!isset($data[$i], $fields[$i]))
 					break;
-				$blob1 .= ", `{$fields[$i]['field']}`";
+				$blob1 .= ",`{$fields[$i]['field']}`";
 				
 				if ( (! $no_escapes) && $data[$i] == '\\N' )
 					/* data for this field is NULL, so type doesn't matter */
@@ -410,10 +405,10 @@ function do_sql_infile_query($table, $filepath, $no_escapes = true)
 				{
 					if ( $fields[$i]['quoteme'] )
 						/* data for this field needs quoting (string) */
-						$blob2 .= ", '{$data[$i]}'";
+						$blob2 .= ",'" . escape_sql($data[$i]) . "'";
 					else
 						/* data for this field is an integer or like type */
-						$blob2 .= ", '{$data[$i]}'";
+						$blob2 .= "," . (int)$data[$i];
 				}
 			}
 			
@@ -526,7 +521,7 @@ function print_sql_datetime($timestamp)
  *                       Test as strict comparison ( === false); SQL bools are in integer columns,
  *                       so this will always detect errors. 
  */
-function get_sql_value($sql)  // or:  get_sql_cell_value()?
+function get_sql_value($sql)
 {
 	$result = do_sql_query($sql);
 

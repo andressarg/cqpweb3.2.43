@@ -1258,7 +1258,6 @@ function update_idlink_item_size_data($corpus, $att_handle)
 	while (false !== ($line = fgets($source)))
 	{
 		list($begin, $end, $val) = explode("\t", rtrim($line, "\r\n"));
-		//list($begin, $end, $val) = explode("\t", trim($line));
 		if (!isset($item_totals_for_id[$val]))
 		{
 			$item_totals_for_id[$val] = 0;
@@ -1281,6 +1280,7 @@ function update_idlink_item_size_data($corpus, $att_handle)
 							`__DATA` = '$blob'
 						where `__ID` = '$which_id'");
 		unset($cpos_collection_for_id[$which_id]);
+		/* i.e. reclaim RAM as we go. */
 	}
 }
 

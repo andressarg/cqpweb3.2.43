@@ -54,7 +54,7 @@ function print_debug_message($message)
  * 
  * If the browser is disconnected, then messages go to the error log.
  * 
- * Messages may be text only or HTML-wrapped (with tag <pre>). 
+ * Messages may be text only or HTML-wrapped (with a 'pre' tag). 
  * This depends config variable on $debug_messages_textonly.
  * 
  * @param string $message   The message to squawk out.

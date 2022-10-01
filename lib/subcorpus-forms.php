@@ -832,11 +832,7 @@ function do_ui_sc_showsubcorpora()
 
 	$show_owner = false;
 	if ($User->is_admin())
-	{
-		$show_owner = false;
-		if (isset($_GET['showOwner']))
-			$show_owner = (bool)$_GET['showOwner'];
-	}
+		$show_owner = (bool)($_GET['showOwner'] ?? false);
 
 	?>
 	
@@ -888,7 +884,12 @@ function do_ui_sc_showsubcorpora()
 		
 		<?php
 
-		$subcorpora_with_freqtables = list_freqtabled_subcorpora($User->username, true, true, true);
+		if ($show_owner)
+			$subcorpora_with_freqtables = list_freqtabled_subcorpora_for_admin(true,true,true);
+		else
+			$subcorpora_with_freqtables = list_freqtabled_subcorpora($User->username, true, true, true);
+// FIXME: If the adminn user is looking at someone else's subcorpora, t
+
 
 		$user_clause = ($show_owner ? '' : "and user = '{$User->username}'");
 		$result = do_sql_query("select * from saved_subcorpora where corpus = '{$Corpus->name}' $user_clause order by name");
@@ -936,7 +937,7 @@ function do_ui_sc_showsubcorpora()
 						, $sc->id
 						, '" data-tooltip="Compile frequency tables for subcorpus <strong>'
 						, $sc->name
-						, '</strong>, allowing calculation of collocations and keywords\')">[Compile]</a>'
+						, '</strong>, allowing calculation of collocations and keywords">[Compile]</a>'
 						;
 			}
 			echo '</td>';

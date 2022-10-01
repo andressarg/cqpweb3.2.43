@@ -46,19 +46,6 @@ if (!isset($argv[1]))
 	exit(1);
 }
 
-
-//TODO make it so that if any argument is a CQPweb constant, then it wil be converted into teh contant value.
-// the following WOULD do it but env constants are not defined yet.
-// 
-// could it be done within execute.php?
-// 
-// $const_map = get_defined_constants()['user'];
-// for($i = 2 ; $i < $argc ; $i++)
-// 	if (is_string[$argv[$i]])
-// 	if (isset($const_map[$argv[$i]]))
-// 		$argv[$i] = $const_map[$argv[$i]];
-// unset($const_map);
-
 $_GET = array();
 
 $_GET['function'] = $argv[1];
@@ -67,7 +54,7 @@ if (!empty($argv))
 	$_GET['args'] = implode('#', $argv); // TODO, I think we can now just pass in an array to execute, can't we???
 unset($argc, $argv);
 
-$execute_cli_is_running = true;
+$_cqpweb_execute_cli_is_running = true;
 
 require('../lib/execute.php');
 

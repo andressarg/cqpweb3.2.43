@@ -60,7 +60,7 @@ function get_keycloud_canvas_extra_height(n_lines)
 }
 
 
-
+// TODO this is only relevant for wmatrix style. 
 /**
  * Return value: DOM object for the new "canvas" element.
  * Parameters are boolean.
@@ -77,6 +77,7 @@ function create_background_svg_canvas(with_caption, in_monochrome)
 	
 	
 	var svg = document.getElementById('keyItemCloud');
+clog(svg);
 
 	var svg_as_str = new XMLSerializer().serializeToString(svg);
 	
@@ -215,6 +216,9 @@ function highlight_link_for_item(e)
  */
 $( function() {
 
+	// TODO this comes from  the initialisation for wmatrix styl;e cloud. it will break the graphivcal ones. 
+	// see commit 1184.
+	
 	if (!we_want_a_cloud)
 		return;
 
@@ -249,6 +253,7 @@ $( function() {
 			}
 	);
 	
+	// tODO I think this is for non-wmx stylee??? no??
 	$('#dl-img-caption,#dl-img-caption-mono').click(
 			function()
 			{
@@ -290,6 +295,7 @@ $( function() {
 			}
 		);
 	
+	// TODO weird conditionm.
 	if (!cloud_wmx_style)
 		return;
 	
@@ -300,6 +306,9 @@ $( function() {
 				list    : wordcloudDataObject
 			}
 		);
+
+	// TODO 
+	
 	
 	$('#keyItemCloudDiv').on(
 			'wordcloudstop', 
@@ -308,7 +317,8 @@ $( function() {
 				/* make links work */
 				$(".wordcloudClickableItem")
 					.click(navigate_to_link_for_item)
-					.hover(highlight_link_for_item);
+					.hover(highlight_link_for_item)
+					;
 				
 				
 				/* NOW create the background cloud canvas in greyscale */ 

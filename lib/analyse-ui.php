@@ -46,6 +46,7 @@ require('../lib/useracct-lib.php');
 require('../lib/usercorpus-lib.php');
 require('../lib/exiterror-lib.php');
 require('../lib/cache-lib.php');
+require('../lib/query-lib.php');
 require('../lib/scope-lib.php');
 require('../lib/xml-lib.php');
 require('../lib/multivariate-lib.php');
@@ -267,8 +268,8 @@ $n_matrix_vars = feature_matrix_n_of_variables($matrix->id);
 	foreach ($factor_integers as $k=>$i)
 	{
 		/* work out degrees of freedom for this analysis; if too low, continue. */
-		$vars_lowered = $n_matrix_vars - $i;
-		$dof = 0.5 * ( (($n_matrix_vars - $i) ** 2) - $n_matrix_vars - $i );
+		$vars_minus_i = $n_matrix_vars - $i;
+		$dof = 0.5 * ( ($vars_minus_i ** 2) - $n_matrix_vars - $i );   //FIXME is this correct ????????? | - n - 1| or | - (n - 1) | ???
 //show_var($e="DOF for $i: $dof.");
 
 		if ($dof < 0)

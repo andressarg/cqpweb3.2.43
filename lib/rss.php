@@ -40,7 +40,7 @@ require('../lib/exiterror-lib.php');
 /* declare global variables */
 $Config = NULL;
 
-cqpweb_startup_environment(CQPWEB_STARTUP_DONT_CONNECT_CQP, RUN_LOCATION_RSS);
+cqpweb_startup_environment(CQPWEB_STARTUP_DONT_CONNECT_CQP|CQPWEB_STARTUP_DONT_CHECK_USER, RUN_LOCATION_RSS);
 
 /* switch to text-mode errors, as they will  be sent out in an XML file */
 $Config->debug_messages_textonly = true;
@@ -66,7 +66,7 @@ $d = escape_html($Config->rss_description);
  * that shouldn't happen as PHP is supposed to interleave with XML,
  * but in (at least) some versions, this is not working out right. 
  */
-echo '<' , '?xml version="1.0" ?' , '>', <<<BEGIN_RSS
+echo '<' , '?xml version="1.0" encoding="UTF-8" ?' , '>', <<<BEGIN_RSS
 
 <rss version="2.0">
 	<channel> 
@@ -76,17 +76,17 @@ echo '<' , '?xml version="1.0" ?' , '>', <<<BEGIN_RSS
 
 BEGIN_RSS;
 
-$result = do_sql_query("select * from system_messages order by timestamp desc");
+$result = do_sql_query("select * from system_messages order by date_of_posting desc");
 if (0 == mysqli_num_rows($result))
 {
 	echo <<<END_OF_DUMMY_ITEM
 
-	<item>
-		<title>No messages at the moment!</title>
-		<link>{$Config->rss_link}?fakeArgumentFromRss=Dummy</link>
-		<description>There are no messages from the CQPweb server just now.</description>
-		<guid>no_messages_just_now</guid>
-	</item>
+		<item>
+			<title>No messages at the moment!</title>
+			<link>{$Config->rss_link}?fakeArgumentFromRss=Dummy</link>
+			<description>There are no messages from the CQPweb server just now.</description>
+			<guid>no_messages_just_now</guid>
+		</item>
 
 END_OF_DUMMY_ITEM;
 }
@@ -98,17 +98,17 @@ else
 if (!isset($o->id)) $o->id = $o->message_id; //TODO delete!!!
 		$i++;
 		$o->date_of_posting = date(DATE_RSS, strtotime($o->date_of_posting));
-		$o->content = escape_html(str_replace("\n", "&nbsp;<br>\n\t\t", $o->content));
+		$o->content = escape_html(str_replace("\n", " <br>\n\t\t", $o->content));
 		$o->header = escape_html($o->header);
 		echo <<<ITEM_COMPLETE
 
-	<item>
-		<title>{$o->header}</title>
-		<link>{$Config->rss_link}</link>
-		<description>{$o->content}</description>
-		<pubDate>{$o->date_of_posting}</pubDate>
-		<guid>{$o->id}</guid>
-	</item>
+		<item>
+			<title>{$o->header}</title>
+			<link>{$Config->rss_link}</link>
+			<description>{$o->content}</description>
+			<pubDate>{$o->date_of_posting}</pubDate>
+			<guid>{$o->id}</guid>
+		</item>
 
 ITEM_COMPLETE;
 	}

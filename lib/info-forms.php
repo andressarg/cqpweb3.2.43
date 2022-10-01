@@ -186,20 +186,54 @@ function do_ui_latest()
 		<th class="concordtable">Latest news</th>
 	</tr>
 
-	<tr><td class="concordgeneral">
+	<tr>
+	
+	<td class="concordgeneral">
 
 	<p>&nbsp;</p>
 
+<!-- Fixed a bug in the installation of IDLINK metadata pages. -->
 
 	<ul>
-<!--  next version TODO:
+		<li>
+		<p><strong>Version 3.2.43</strong>, 2021-03-01</p>
+		<p>
+		Version bump for a year's worth of bug fixes, including some pretty major ones. 
+		</p>
+		</li>
 
-* finish work on dist.
+		<li>
+		<p><strong>Version 3.2.42</strong>, 2020-03-12</p>
+		<p>
+		Assorted bug fixes. 3.2 is now feature-frozen and will only receive bug-fix updates.
+		<br>
+		New features will be added to v3.3 only.
+		</p>
+		</li>
+
+ 		<li>
+		<p><strong>Version 3.2.41</strong>, 2020-01-09</p>
+		<p>
+		Finalised the (undocumented) &ldquo;run CQPweb apps&rdquo; tool.
+		</p>
+		<p>
+		Improved memory usage in subcorpus manipulation.
+		</p>
+		<p>
+		Fixed a ton of bugs, including some major issues in distribution tables.
+		</p>
+		</li>
+		
+		<li>
+		<p><strong>Version 3.2.40</strong>, 2019-09-17</p>
 		<p>
 		Extended and streamlined the distribution tool to do a larger range of operations based on XML.
 		</p>
-
- -->
+		<p>
+		Did some subcorpus-management optimisation.
+		</p>
+		</li>
+		
 		<li>
 		<p><strong>Version 3.2.39</strong>, 2019-07-04</p>
 		<p>

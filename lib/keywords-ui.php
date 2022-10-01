@@ -45,6 +45,7 @@ require('../lib/environment.php');
 /* include function library files */
 require('../lib/sql-lib.php');
 require('../lib/general-lib.php');
+require('../lib/query-lib.php');
 require('../lib/html-lib.php');
 require('../lib/exiterror-lib.php');
 require('../lib/corpus-lib.php');
@@ -360,11 +361,11 @@ if ($table_foreign[1] === true)
 
 /* get a string to put into linked queries with the subcorpus; also, touch subcorpus frequency lists */
 
-$restrict_string = array();
+$restrict_url_fragment = array();
 
 foreach(array(1, 2) as $i)
 {
-	$restrict_string[$i] = '';
+	$restrict_url_fragment[$i] = '';
 	if ('::entire_corpus' == $subcorpus[$i])
 		/* this is the home corpus (or a foreign corpus), so no restrict needed; */
 		/* if foreign, will be set to false later */
@@ -372,11 +373,11 @@ foreach(array(1, 2) as $i)
 	else if ('::remainder' == $subcorpus[$i])
 		/* use '' (empty string) to signal "search in whole corpus" (in comp mode, see below); 
 		 * otherwise use false to signal "rest of corpus, so no link" */
-		$restrict_string[$i] = false;
+		$restrict_url_fragment[$i] = false;
 	else
 	{
 		/* this is a subcorpus -- home or foreign, so a restrict is needed */
-		$restrict_string[$i] = '&del=begin&t=~sc~'. $subcorpus[$i] . '&del=end';
+		$restrict_url_fragment[$i] = '&del=begin&t=~sc~'. $subcorpus[$i] . '&del=end';
 		/* if foreign, will be set to false later */
 		
 		/* and we should touch it */
@@ -385,13 +386,13 @@ foreach(array(1, 2) as $i)
 }
 /* and cos we already know the first table is NOT foreign, we only check # 2... */
 if ($table_foreign[2])
-	$restrict_string[2] = false;
+	$restrict_url_fragment[2] = false;
 
 
 
 /* special case: comp mode && ::remainder mode means both sides can just use the whole corpus as their restriction */
 if ('comp' == $kw_method && in_array('::remainder', $subcorpus))
-	$restrict_string[1] = $restrict_string[2] = '';
+	$restrict_url_fragment[1] = $restrict_url_fragment[2] = '';
 
 
 
@@ -988,7 +989,7 @@ else
 		$begin_at = (($page_no - 1) * $per_page) + 1; 
 	
 		for ( $i = 0 ; $i < $n_key_items ; $i++ )
-			echo print_keyword_table_row(mysqli_fetch_object($result), ($begin_at + $i), $att_for_comp, $restrict_string, $corpus_tokens)
+			echo print_keyword_table_row(mysqli_fetch_object($result), ($begin_at + $i), $att_for_comp, $restrict_url_fragment, $corpus_tokens)
 	 			;
 		if (1 > $n_key_items)
 		{
@@ -1088,7 +1089,7 @@ else
 										$rank = 1;
 										while ($o = mysqli_fetch_object($result))
 											$wmatrix_htmls[$o->item] 
-												= print_keycloud_wmatrix_item($o, $rank++, true, $att_for_comp, $restrict_string[1]);
+												= print_keycloud_wmatrix_item($o, $rank++, true, $att_for_comp, $restrict_url_fragment[1]);
 										ksort($wmatrix_htmls, SORT_NATURAL|SORT_FLAG_CASE);
 									}
 									
@@ -1172,7 +1173,7 @@ else
 							$items_for_cloud[] = array($o->item, 2 * (int)round($scaler * $root($o->freq1), 0)); 
 							break;
 						}
-						$link_hash[$o->item] = get_keyword_query_url($o->item, $att_for_comp, $restrict_string[1]);
+						$link_hash[$o->item] = get_keyword_query_url($o->item, $att_for_comp, $restrict_url_fragment[1]);
 					}
 					if ('freq' == $output_type)
 						usort($items_for_cloud, function ($a, $b) { $x = $b[1]-$a[1] ; return (0 != $x ? ($x/abs($x)) : 0); } );
@@ -1564,7 +1565,7 @@ function do_keywords_table_download($att_desc, $description, $result, $corpus_si
 			echo "\tStat.";	
 	}
 
-	echo "$eol$eol";
+	echo $eol, $eol;
 
 
 	for ($i = 1; $o = mysqli_fetch_object($result) ; $i++ )
@@ -1622,14 +1623,14 @@ function parse_keyword_table_parameter($par, $html = true)
 	if ('::entire_corpus' == $par)
 	{
 		$subcorpus = "::entire_corpus";
-		$base = "freq_corpus_$Corpus";
+		$base = "freq_corpus_$Corpus"; //TODO 3.3
 		$desc = ($html ? ("whole &ldquo;" . escape_html($Corpus->title). "&rdquo;") : ("whole \"" . $Corpus->title. "\"")) ;
 	}
 
 	else if ('::remainder' == $par)
 	{
 		$subcorpus = '::remainder';
-		$base = "freq_corpus_$Corpus";
+		$base = "freq_corpus_$Corpus"; // TODO 3.3
 		$desc = ($html ? ("the rest of &ldquo;" . escape_html($Corpus->title). "&rdquo;") : ("the rest of \"{$Corpus->title}\"")) ;
 	}
 	
@@ -1649,20 +1650,20 @@ function parse_keyword_table_parameter($par, $html = true)
 				
 				switch($m[1])
 				{
-				/* it's a subcorpus, owned by the user, in this corpus */
+					/* it's a subcorpus, owned by the user, in this corpus */
 				case 'lus':
 					if (!$sc_record->owned_by_user())
 						exiterror("You cannot analyse keywords using that data, because you do not have permission to use it.");
 					break;
 					
-				/* it's a subcorpus owned by someone else, but granted to the present user, in this corpus. */
+					/* it's a subcorpus owned by someone else, but granted to the present user, in this corpus. */
 				case 'lgs':
 					// TODO this isn't implemented yet. func exists, but is not complete 
 					if (!subcorpus_is_granted_to_user($sc_record->id, $User->id))
 						exiterror("You cannot analyse keywords using that data, because you do not have permission to use it.");
 					break;
 					
-				/* it's a subcorpus owned by someone else, but made public, in this corpus. */
+					/* it's a subcorpus owned by someone else, but made public, in this corpus. */
 				case 'lps':
 					if (!$sc_record->get_freqtable_record()->public)
 						exiterror("You cannot analyse keywords using that data, because you do not have permission to use it.");
@@ -1671,7 +1672,7 @@ function parse_keyword_table_parameter($par, $html = true)
 				}
 				
 				$subcorpus = $sc_record->id;
-				if (false === ($base = $sc_record->get_freqtable_base()))
+				if (false === ($base = $sc_record->get_freqtable_base())) // TODO 3.3
 					exiterror("The subcorpus you selected has no frequency list! Please compile the frequency list and try again.\n");
 				$desc = 'subcorpus ' . ($html ? "&ldquo;{$sc_record->name}&rdquo;" : "\"{$sc_record->name}\"");
 			}

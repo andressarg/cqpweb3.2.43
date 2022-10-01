@@ -36,6 +36,7 @@ function do_ui_queryhistory()
 	global $User;
 	global $Config;
 	global $Corpus;
+	$m = NULL;
 	
 	if (isset($_GET['historyView']))
 		$view = $_GET['historyView'];
@@ -69,7 +70,6 @@ function do_ui_queryhistory()
 	/* if the corpus has an indexing date set, only get query history instances newer than that
 	 * (to avoid retrieving instances from before a re-indexing, which might use incompatible attributes/metadata fields.; */
 	$timewhere = (0 == strtotime($Corpus->date_of_indexing[0]) ? '' : " and date_of_query > '{$Corpus->date_of_indexing}' ");
-	//TODO should this be// (sql_timestamp_is_zero($Corpus->date_of_indexing) ? '' : " and date_of_query > '{$Corpus->date_of_indexing}' ");ld this be
 	
 	switch ($user_to_show)
 	{
@@ -222,14 +222,21 @@ function do_ui_queryhistory()
 			echo "<td class='concordgeneral' align='center'>" , $row['user'] , '</td>';
 		
 		if ( $view == 'simple' && $row['simple_query'] != "" )
+		{
+			if (preg_match('/^\(\?(standard|longest|shortest|traditional)\)(.*)$/', $row['simple_query'], $m))
+				$link_body = escape_html($m[2]) . '&nbsp;&nbsp;with match strategy <em>' . $m[1] . '</em>';
+			else
+				$link_body = escape_html($row['simple_query']);
+			
 			echo '<td class="concordgeneral">'
  				, '<a id="qInsertLink:', $i, '" class="hasToolTip" href="index.php?ui=search&insertString=' 
 				, urlencode($row['simple_query']) , '&insertType=' , $row['query_mode'] , '"'
 				, ' data-tooltip="Insert query string into query window">' 
-				, escape_html($row['simple_query']) , '</a>'
+				, $link_body, '</a>'
 				, ($row['query_mode'] == 'sq_case' ? " (case sensitive)" : "") 
 				, '</td>'
 				;
+		}
 		else
 			echo '<td class="concordgeneral">'
  				, '<a id="qInsertLink:', $i, '" class="hasToolTip" href="index.php?ui=search&insertString=' 
@@ -466,45 +473,6 @@ function do_ui_catqueries()
 		<?php
 	}
 	
-	
-	/* now it's time to look up the categorised queries */
-
-	
-	/* 
-	 * the saved_catqueries table does not contain the actual info, for that we need to look up the savename etc. 
-	 * from the main query cache
-	 */
-	$user_clause = ($usercolumn ? '' : " user='$user_to_show' and ");
-	$result = do_sql_query("select catquery_name, category_list, dbname from saved_catqueries where $user_clause corpus='{$Corpus->name}'");
-
-	$catqueries_to_show = array();
-
-	for ( $i = 1 ; true ; $i++ )
-	{
-		/* note, this loop includes some hefty mysql-ing 
-		 * BUT it is not expected that the number of
-		 * entries in the saved_catqueries table will be large
-		 */ 
-		if ( !($row = mysqli_fetch_row($result)))
-			break;
-		/* so we don't have to run the SQL query below unless 'tis needed */
-		if ($i < $begin_at)
-			continue;
-
-		/* find out how many rows have been assigned a value */
-		$n = get_sql_value("select count(*) from `{$row[2]}` where category IS NOT NULL");
-		
-		/* assemble the info for this categorised query line */
-		$catqueries_to_show[$i] = array(
-			'qname' => $row[0],
-			'catlist' => explode('|', $row[1]),
-			'query_record' => QueryRecord::new_from_qname($row[0]),
-			'number_categorised' => $n
-			);
-		$catqueries_to_show[$i]['number_of_hits'] = $catqueries_to_show[$i]['query_record']->hits();
-	}
-
-
 	/* set this up as a variable, to be used in a loop below. */
 	$action_form_begin = '
 
@@ -524,7 +492,17 @@ function do_ui_catqueries()
 		</td>
 
 		';
-	/* so we simply echo $action_form_begin , $catqueries_to_show[$i]['qname'] , $action_form_end */
+	/* so we simply echo $action_form_begin , $row_qname , $action_form_end */
+	
+	/* now it's time to look up the categorised queries */
+
+	
+	/* 
+	 * the saved_catqueries table does not contain the actual info, for that we need to look up the savename etc. 
+	 * from the main query cache
+	 */
+	$user_clause = ($usercolumn ? '' : " user='$user_to_show' and ");
+	$result = do_sql_query("select catquery_name, category_list, dbname from saved_catqueries where $user_clause corpus='{$Corpus->name}'");
 
 	?>
 
@@ -541,6 +519,9 @@ function do_ui_catqueries()
 		</tr>
 
 	<?php
+	if (1 > mysqli_num_rows($result))
+		echo "<tr>\n<td class='concordgrey' colspan='$n_columns' align='center'><p>You have no categorised queries for this corpus.</p></td></tr>";
+	
 	
 	$n_columns = ($usercolumn ? 8 : 7);
 
@@ -550,16 +531,26 @@ function do_ui_catqueries()
 	if (($alt_toplimit + 1) < $toplimit)
 		$toplimit = $alt_toplimit + 1;
 	
-
-
-	if (empty($catqueries_to_show))
-		echo "<tr>\n<td class='concordgrey' colspan='$n_columns' align='center'><p>You have no categorised queries for this corpus.</p></td></tr>";
-	
 	
 	for ( $i = 1 ; $i < $toplimit ; $i++ )
 	{
-		if (!isset($catqueries_to_show[$i]))
+		/* note, this loop includes some hefty mysql-ing 
+		 * BUT it is not expected that the number of
+		 * entries in the saved_catqueries table will be large
+		 */ 
+		if ( !($row = mysqli_fetch_row($result)))
 			break;
+		/* so we don't have to run the SQL query below unless 'tis needed */
+		if ($i < $begin_at)
+			continue;
+
+		/* find out how many rows have been assigned a value */
+		$n_categorised = get_sql_value("select count(*) from `{$row[2]}` where category IS NOT NULL");
+		$row_qname = $row[0];
+		$catlist = explode('|', $row[1]);
+		$qrecord = QueryRecord::new_from_qname($row[0]);
+		$n_hits = $qrecord->hits();
+
 
 		/* no. */
 		echo "<tr>\n<td class='concordgeneral' align='center'>$i</td>";
@@ -567,43 +558,43 @@ function do_ui_catqueries()
 		/* user */
 		if ($usercolumn)
 			echo "<td class='concordgeneral' align='center'>" 
-				, $catqueries_to_show[$i]['query_record']->user 
+				, $qrecord->user 
 				, '</td>'
  				;
 		
 		/* Name of set */
-		if (!empty($catqueries_to_show[$i]['query_record']->save_name))
-			$print_name = $catqueries_to_show[$i]['query_record']->save_name;
+		if (!empty($qrecord->save_name))
+			$print_name = $qrecord->save_name;
 		else
-			$print_name = $catqueries_to_show[$i]['qname'];
+			$print_name = $row_qname;
 		
 		echo '<td class="concordgeneral">'
 			, '<a id="catQConc:', $i , '" class="hasToolTip" href="concordance.php?program=categorise&qname='
-			, $catqueries_to_show[$i]['qname'] 
+			, $row_qname 
 			, '" data-tooltip="View or amend category assignments">'
 			, $print_name , '</a></td>'
 			;
 
 		/* categories */
-		echo '<td class="concordgeneral" align="center">' , implode(', ', $catqueries_to_show[$i]['catlist'])
+		echo '<td class="concordgeneral" align="center">' , implode(', ', $catlist)
 			, '</td>'
 			;
 		
 		/* number of hits */
-		echo '<td class="concordgeneral" align="center">' , $catqueries_to_show[$i]['number_of_hits'] , '</td>';
+		echo '<td class="concordgeneral" align="center">' , $n_hits , '</td>';
 		
 		/* number and % of hits categorised */
-		echo '<td class="concordgeneral" align="center">' , $catqueries_to_show[$i]['number_categorised'] 
+		echo '<td class="concordgeneral" align="center">' , $n_categorised 
 			, ' ('
-			, number_format(100.0*(float)$catqueries_to_show[$i]['number_categorised']/(float)$catqueries_to_show[$i]['number_of_hits'], 0) 
+			, number_format(100.0*(float)$n_categorised/(float)$n_hits, 0) 
 			, '%)</td>'
 			;
 		
 		/* date of saving */
-		echo '<td class="concordgeneral" align="center">' , $catqueries_to_show[$i]['query_record']->print_time() , '</td>';
+		echo '<td class="concordgeneral" align="center">' , $qrecord->print_time() , '</td>';
 		
 		/* actions */
-		echo $action_form_begin , $catqueries_to_show[$i]['qname'] , $action_form_end;
+		echo $action_form_begin , $row_qname , $action_form_end;
 		
 		echo "</tr>\n";
 	}
@@ -613,8 +604,6 @@ function do_ui_catqueries()
 	
 	<?php
 	
-	//TODO use the new print_simple_navlinks function
-
 	$navlinks = '<table class="concordtable fullwidth"><tr><td class="basicbox" align="left';
 
 	if ($begin_at > 1)
@@ -751,7 +740,6 @@ function do_ui_savedqueries()
 
 
 
-// TODO move this function?
 function do_ui_aboutmatrix()
 {
 	global $Corpus;
@@ -841,14 +829,10 @@ function do_ui_aboutmatrix()
 			foreach($variable_list as $v)
 				echo "\n\t\t<tr>"
 					, '<td class="concordgeneral">' , $v->label , '</td>'
-					// TODO if source_info is too long, shorten it and add a Jquery "click for more" that will un-hide it.
-					// temp hack to accomplish similar....
 					, '<td class="concordgeneral">' , escape_html(mb_substr($v->source_info, 0, 50, 'UTF-8')) , '</td>'
 					, '<td class="concordgeneral"><a href="analyse.php?matrix=', $matrix->id, '&correl=', $v->label ,'">[Show correlations]</a></td>'
 					, "</tr>\n" 
 					;
-
-//TODO - view the whole correlation matrix .... graphically???
 		?>
 	
 	</table>
@@ -953,9 +937,6 @@ function do_ui_showmatrix()
 	 * This is a v quick and dirty way of printing the matrix. 
 	 * At least now we have  a link to get back to the analysis screen. 
 	 * 
-	 * TODO use menu-item-writer system to make there be a clickable link on the left side to go back.
-	 * 
-	 * OR- maybe this should be a full screen?
 	 */
 	
 	
@@ -963,10 +944,8 @@ function do_ui_showmatrix()
 }
 
 
-// TODO move this function?
 function do_ui_analysecorpus()
 {
-	// TODO this is shonky. Use collapsable menus. Use an object hierarchy.
 	if (! empty($_GET['showMatrix']))
 	{
 		do_ui_showmatrix();
@@ -1051,9 +1030,6 @@ function do_ui_analysecorpus()
 		
 		<?php
 		
-		// TODO add N features, N objects to the display?
-		
-		
 		$list = get_all_feature_matrices($Corpus->name, $User->username);
 
 		if (empty($list))
@@ -1092,7 +1068,7 @@ function do_ui_analysecorpus()
 	
 
 	<!-- begin feature matrix control block -->
-	<form id="featureMatrixDesign" action="multivariate-act.php" method="get">
+	<form id="featureMatrixDesign" action="multivariate-act.php" method="post">
 		<input type="hidden" name="multivariateAction" value="buildFeatureMatrix">
 		<table class="concordtable fullwidth">
 			<tr>
@@ -1145,7 +1121,7 @@ function do_ui_analysecorpus()
 				<td class="concordgrey" width="50%">
 					Select a subcorpus or the full corpus. 
 					<br>
-					Only the texts in the subcorpus you select will be included in the corpus.
+					Only texts in the subcorpus you select will be included in the feature matrix.
 					<!--
 					<br>
 					(when we add other possible levels, it will be possible to use subcorpora based on those divisions)
@@ -1255,9 +1231,6 @@ function do_ui_analysecorpus()
 			}
 			else
 				$n_arithmetic = 15;
-			// TODO have 15 rows fr now,
-			// later, an embggenable form will be needed. 
-			
 			
 			for ($i = 1 ; $i <= $n_arithmetic ; $i++)
 			{
@@ -1456,8 +1429,6 @@ function do_ui_analysecorpus()
 	
 	/*
 	
-	TODO
-	
 	Here is what will be on the controls for a saved feature matrix.
 	
 	(1) Export feature matrix.
@@ -1481,8 +1452,6 @@ function do_ui_analysecorpus()
 }
 
 
-// TODO this doesn't really seem to belong in this file. the matrix ones do cos they used save Qs, but not this. Recosnider correct module!
-// TODO more fruity treats needed in this display.
 function do_ui_lgcurve()
 {
 	global $Corpus;
@@ -1491,7 +1460,6 @@ function do_ui_lgcurve()
 	if ($Config->hide_experimental_features)
 		exiterror("lgcurves are an experimental feature, disabled in your system.");
 	
-	// TODO 
 	?>
 
 	<table class="concordtable fullwidth">
@@ -1540,7 +1508,6 @@ function do_ui_lgcurve()
 				, "\n\t\t\t<td class=\"concordgeneral\" align=\"center\">"
 					, '<a class="menuItem" href="dataviz.php?viz=lgc&curves=', $lgcurve->id, '">[Plot graph]</a></td>'
 				, "\n\t\t\t<td class=\"concordgeneral\" align=\"center\">"
-					// TODO this DEFINETILY needs "are you sure? modal dialog protection jQuery stuff./
 					, ($User->is_admin() 
 						? '<a class="menuItem" href="lgcurve-act.php?lgAction=delete&lgcToDelete=' . $lgcurve->id . '">[Delete]</a></td>' 
 						: '&nbsp;</td>') 
@@ -1771,7 +1738,6 @@ function do_ui_uploadquery()
 	 * with relatively minor tweaks only to the code (parameterisable!) ? */
 }
 
-// TODO the "unify" function appears on admin query cache page. it shouldn't.
 function print_cache_table($begin_at, $per_page, $user_to_show = NULL, $show_unsaved = true, $show_filesize = true, $delete_back_to = 'index')
 {
 	global $User;
@@ -1812,7 +1778,7 @@ function print_cache_table($begin_at, $per_page, $user_to_show = NULL, $show_uns
 	$save_together = '';
 	
 	/* only show interface to union/intersect/difference if there are 2+ savedQs. */
-	if (2 <= mysqli_num_rows($result))
+	if (2 <= mysqli_num_rows($result) && !$show_unsaved)
 	{
 		$qlist_options = [];
 		while ($o = mysqli_fetch_object($result))
@@ -1820,42 +1786,43 @@ function print_cache_table($begin_at, $per_page, $user_to_show = NULL, $show_uns
 		mysqli_data_seek($result, 0);
 		/* result gets reused below, so rewind it to get it ready. */
 		
-		ksort($qlist_options) ; // TODO, in saved/categorised Q display, wouldn't savename sort be better????
+		ksort($qlist_options) ; 
 		
 		$opt_block = '<option selected>Select a query...</option> '. implode(' ', $qlist_options);
 		$save_together = <<<END_OF_HTML_SAVE_TOGETHER
-
-<form action="temp-save-act.php" method="get">
-	<table class="concordtable fullwidth" width="100%">
-		<tr>
-			<th class="concordtable">Unify two saved queries into one</th>
-		</tr>
-		<tr>
-			<td class="concordgeneral">
-				<p>
-					<select name="q_a">$opt_block</select> 
-					and 
-					<select name="q_b">$opt_block</select> 
-				</p>
-			</td>
-		</tr>
-		<tr>
-			<td class="concordgeneral">
-				<p>
-					Specify name for new saved query: 
-					<input type="text" name="saveScriptSaveName">
-				</p>
-			</td>
-		</tr>
-		<tr>
-			<td class="concordgeneral">
-				<p>
-					<input type="submit" value="Unify saved queries">
-				</p>
-			</td>
-	</table>
-</form>
-
+			<tr><td>
+			<form action="temp-save-act.php" method="get">
+				<table class="concordtable fullwidth" width="100%">
+					<tr>
+						<th class="concordtable">Unify two saved queries into one</th>
+					</tr>
+					<tr>
+						<td class="concordgeneral">
+							<p>
+								<select name="q_a">$opt_block</select> 
+								and 
+								<select name="q_b">$opt_block</select> 
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<td class="concordgeneral">
+							<p>
+								Specify name for new saved query: 
+								<input type="text" name="saveScriptSaveName">
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<td class="concordgeneral">
+							<p>
+								<input type="submit" value="Unify saved queries">
+							</p>
+						</td>
+				</table>
+			</form>
+			</td></tr>
+			
 END_OF_HTML_SAVE_TOGETHER;
 	}
 
@@ -1887,7 +1854,6 @@ END_OF_HTML_SAVE_TOGETHER;
 
 	for ( $i = 1 ; $i < $toplimit ; $i++ )
 	{
-
 		if (false === ($qr = QueryRecord::new_from_db_result($result)))
 			break;
 		if ($i < $begin_at)
@@ -1913,13 +1879,11 @@ END_OF_HTML_SAVE_TOGETHER;
 		$s .= '<td class="concordgeneral" align="center">' . $qr->print_time() . '</td>';
 		
 		if ($qr->saved == CACHE_STATUS_SAVED_BY_USER)
-		{
 			$s .= '<td class="concordgeneral" align="center">' 
-				. '<a id="rnmSQ:' . $i . '" class="menuItem hasToolTip" href="savequery.php&sqAction=get_save_rename&qname='
+				. '<a id="rnmSQ:' . $i . '" class="menuItem hasToolTip" href="savequery.php?sqAction=get_save_rename&qname='
 				. $qr->qname . '" data-tooltip="Rename this saved query">'
 				. '[Rename]</a></td>'
 				;
-		}
 		else
 			$s .= '<td class="concordgeneral" align="center">-</td>';
 		
@@ -1933,7 +1897,6 @@ END_OF_HTML_SAVE_TOGETHER;
 		$s .= '<td class="concordgeneral" align="center">' 
 				. '<a id="delSQ:' . $i . '" class="menuItem hasToolTip" href="savequery-act.php?sqAction=delete_saved&qname='
 				. $qr->qname . '&backTo=' . $delete_back_to . '" data-tooltip="Delete this saved query">'
-// TODO this delete_back_to won't return people to this page: needs parameters beginAt/pp? 
 				. '[x]</a>'
 			. "</td></tr>\n"
 			;
@@ -1942,30 +1905,6 @@ END_OF_HTML_SAVE_TOGETHER;
 	
 	$s .= "\t</table>\n\n\n";
 	
-	//TODO use the new print_simple_navlinks function
-
-/*
-	$navlinks = '<table class="concordtable fullwidth"><tr><td class="basicbox" align="left';
-
-	if ($begin_at > 1)
-	{
-		$new_begin_at = $begin_at - $per_page;
-		if ($new_begin_at < 1)
-			$new_begin_at = 1;
-		$navlinks .=  '"><a href="index.php?' . url_printget(array(array('beginAt', "$new_begin_at")));
-	}
-	$navlinks .= '">&lt;&lt; [Newer queries]';
-	if ($begin_at > 1)
-		$navlinks .= '</a>';
-	$navlinks .= '</td><td class="basicbox" align="right';
-	
-	if (mysqli_num_rows($result) > $i)
-		$navlinks .=  '"><a href="index.php?' . url_printget(array(array('beginAt', "$i + 1")));
-	$navlinks .= '">[Older queries] &gt;&gt;';
-	if (mysqli_num_rows($result) > $i)
-		$navlinks .= '</a>';
-	$navlinks .= "</td></tr></table>\n\n\n";
-*/
 	$navlink_base =  'index.php?ui=cachedQueries';
 	
 	$navlinks = print_simple_navlinks(

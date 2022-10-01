@@ -153,7 +153,7 @@ foreach ($metadata as $field => $value)
 
 		default:
 			/* in future there may be cached-data-fields here: don't show them */
-			continue;
+			continue 2;
 		}
 	}
 

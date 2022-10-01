@@ -555,6 +555,8 @@ function install_new_corpus()
 
 // test code for a bug:
 if (realpath($datadir) == realpath($Config->dir->index)) {exit("Critical error in installation: corpus dir not specified");}
+// This bug seems ot have been due to corpus handles supplied that were too long. 
+// There is a HANDLE MAX CORUS check in the info object now, so this should no longer be needed. Doesn't hurt to keep though.
 
 		if (is_dir($datadir))
 		{

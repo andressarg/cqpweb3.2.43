@@ -83,10 +83,10 @@ function corpus_make_freqtables($corpus)
 		freq int(11) unsigned default NULL";
 	foreach ($attribute as $att)
 		$sql .= ",
-			$att varchar(255) NOT NULL";
+			`$att` varchar(255) NOT NULL";
 	foreach ($attribute as $att)
 		$sql .= ",
-			key ($att)";
+			key (`$att`)";
 	$sql .= "
 		) CHARACTER SET utf8 COLLATE $corpus_sql_collation";
 
@@ -182,13 +182,7 @@ function corpus_make_freqtables($corpus)
  * Creates frequency lists for a --subsection only-- of the current corpus, 
  * ie a restriction or subcorpus.
  * 
- * Note that the specification of a subcorpus trumps restrictions. 
- * (As elsewhere, e.g. when a query happens.) 
- * 
- * @ param string $subcorpus    Serialisation -- ie, integer id in string form; or, empty string.
- * @ param string $restriction  Serialisation -- ie, DB string serialised form rEstriciton obj; or, empty string.
- * 
- * @param QueryScope $qscope  QueryScope object containining the subsection to make freqtables for.
+ * @param QueryScope $qscope  QueryScope object containing the subsection to make freqtables for.
  */
 function subsection_make_freqtables($qscope)
 {
@@ -216,8 +210,9 @@ function subsection_make_freqtables($qscope)
 	/* BEFORE WE START: can we use the text-index, or do we need to fall-back to cwb-scan-corpus? */ 
 
 	/* set $use_freq_index to true if the item type is 'text', and get an item list. */
-	$item_type = $item_identifier = NULL;
-	$list = $qscope->get_item_list($item_type, $item_identifier);
+	$item_type = $qscope->get_item_type();
+	$item_type = $qscope->get_item_identifier();
+	$list = $qscope->get_item_list();
 	$use_freq_index = ($item_type == 'text' && $item_identifier == 'id');
 	/* if the subsection is a set of complete texts, we can use the more efficient approach via the CWB frequency table
 	 * (essentially a cwb-encoded cache of the output from cwb-scan-corpus, grouped text-by-text). */
@@ -245,6 +240,7 @@ function subsection_make_freqtables($qscope)
 	foreach ($attribute as $att)
 		$sql .= ", key(`$att`)";
 	$sql .= ") CHARACTER SET utf8 COLLATE {$Corpus->sql_collation}";
+//var_dump($Corpus->sql_collation); var_dump($Corpus); exit;
 	do_sql_query($sql);
 
 
@@ -264,13 +260,13 @@ function subsection_make_freqtables($qscope)
 
 		/* run command to extract the frequency lines for those bits of the corpus */
 		$cmd_scancorpus 
-			= "{$Config->path_to_cwb}cwb-scan-corpus -r \"{$Config->dir->registry}\" -F __freq "
+			= "{$Config->path_to_cwb}cwb-scan-corpus -r \"{$Config->dir->registry}\" -o \"$master_table_loadfile\" -F __freq "
 			. "-R \"" . $regionfile->get_filename()
 			. "\" {$Corpus->cqp_name}__FREQ"
 			;
 		foreach ($attribute as $att)
 			$cmd_scancorpus .= " $att+0";
-		$cmd_scancorpus .= " > \"$master_table_loadfile\"";
+		$cmd_scancorpus .=  ' 2>&1';
 
 		$status = 0;
 		$msg = array();
@@ -440,10 +436,9 @@ function make_cwb_freq_index($corpus)
 	$c_info = get_corpus_info($corpus);
 	
 	/* disallow this function for corpora with only one text */
-// 	list($count_of_texts_in_corpus) = mysql_fetch_row(do_sql_query("select count(*) from text_metadata_for_$corpus"));
-// 	if ($count_of_texts_in_corpus < 2)
 	if (2 > (int)get_sql_value("select count(*) from text_metadata_for_$corpus"))
-		exiterror("This corpus only contains one text. Using a CWB frequency text-index is therefore neither necessary nor desirable.");
+		exiterror("This corpus only contains one text. Using a CWB text-by-text frequency index is therefore neither necessary nor desirable.");
+	/* NB, it would probably be safe to use c_info->size_texts, but let's use direct SQL just as a precaution */
 	
 	/* this function may take longer than the script time limit */
 	php_execute_time_unlimit();
@@ -704,7 +699,7 @@ function list_corpus_freqtable_components($corpus)
 {
 	$list = [];
 	
-	foreach(array_merge(list_corpus_annotations($corpus), ['word']) as $t)
+	foreach(array_merge(array_keys(list_corpus_annotations($corpus)), ['word']) as $t)
 		$list[] = 'freq_corpus_' . $corpus . '_' . $t;
 	
 	return $list;
@@ -717,7 +712,7 @@ function list_saved_freqtable_components($freqtable_name, $corpus)
 {
 	$list = [];
 	
-	foreach(array_merge(list_corpus_annotations($corpus), ['word']) as $t)
+	foreach(array_merge(array_keys(list_corpus_annotations($corpus)), ['word']) as $t)
 		$list[] = $freqtable_name . '_' . $t;
 	
 	return $list;
@@ -1261,5 +1256,29 @@ function list_freqtabled_subcorpora($username, $seek_local = true, $seek_owned =
 }
 
 
+/**
+ * Returns a list of IDs of subcorpora that have freqlists in cache. 
+ * (sorted by the name of the subcorpus!)
+ *
+ * If seek owned is false, the list that comes back is limited by the grants (to implement).
+ *
+ * By default, publics are excluded. Allowing publics to be included only takes effect when
+ * seeking owned.
+ */
+function list_freqtabled_subcorpora_for_admin($username, $seek_local = true, $seek_owned = true, $include_public = false)
+{
+//TODO do anything with the argum,ents? Currently, we respect only "Seek local./ 
+//both thi9s and the previous function need seriosyu sorting out! 
+        global $Corpus;
 
+	$local_cond = $seek_local ? "where saved_freqtables.`corpus` = '$Corpus'" : "";
+
+	$sql = "select saved_freqtables.query_scope as id
+				from  saved_freqtables inner join saved_subcorpora on saved_freqtables.query_scope = saved_subcorpora.id
+				$local_cond
+				order by saved_subcorpora.name asc";
+
+	$collection = list_sql_values($sql);
+	return $collection;
+}
 

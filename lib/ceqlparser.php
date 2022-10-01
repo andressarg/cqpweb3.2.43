@@ -47,7 +47,7 @@
 
 
 /**
- * This class of objects represent the context within whihc som oparsing rule is attempted.
+ * This class of objects represents the context within which some parsing rule is attempted.
  */
 class CeqlParseFrame
 {
@@ -1074,9 +1074,9 @@ class CeqlParser extends CeqlParserBackend
 		$input = preg_replace('/(\\\\[aAlLuUdDwW])/'   , ' $1 ', $input);
 		$input = trim($input);
 		
-		$items = explode(' ', $input);
-		if (empty($items))
+		if (empty($input))
 			throw new Exception("empty wildcard pattern '' $orig_input '' is not allowed\n");
+		$items = explode(' ', $input);
 		
 		$regexp_comps = $this->Apply("wildcard_item", $items);
 
@@ -1205,7 +1205,7 @@ class CeqlParser extends CeqlParserBackend
  * if (empty($cqp_query) 
  * {
  *     $html_msg = $CEQL->HtmlErrorMessage();     # ready-made HTML error message
- *     echo "<html><body>$html_msg</body></html>\n";
+ *     echo "<html lang='en'><body>$html_msg</body></html>\n";
  *     exit(0);
  * }
  * 

@@ -54,6 +54,7 @@ require('../bin/cli-lib.php');
 
 		/* the most recent database version: ie the last version whose release involved a DB change */
 		$last_changed_version = '3.2.40';
+		/* the 3.2 series is unlikely to make any further changes. */
 		
 		/* 
 		 * versions where there is no change. Array of old_version => version that followed. 
@@ -140,7 +141,7 @@ if (!$greater_than_3_0_16)
 	upgrade_db_version_from('3.0.16');
 }
 
-while (0 > version_compare($version = get_cqpweb_db_version(), $last_changed_version))
+while (0 > version_compare($version = get_sql_cqpwebdb_version(), $last_changed_version))
 {
 	echo "Current DB version is $version ; target version is $last_changed_version .  About to upgrade....\n";
 	upgrade_db_version_from($version);
@@ -232,7 +233,7 @@ END_OF_MESSAGE;
 	echo <<<END_OF_MESSAGE
 
 	======================================================================
-	Data insertion processes complete. .
+	Data insertion processes complete.
 	======================================================================
 
 

@@ -34,6 +34,8 @@
  * 
  * (note that everything within [] needs to be url-encoded for non-alphanumerics)
  * 
+ * args is also allowed to be an array.
+ * 
  * 
  * ANOTHER IMPORTANT NOTE:
  * =======================
@@ -123,7 +125,7 @@ if (isset($_GET['args']))
 	 * 
 	 * Note this means that it being integer 1, or an array containing integer 1, has the same effect.
 	 * 
-	 * It also measn that an array cannot be passed as a bare single-argument: it must be wrapped.
+	 * It also means that an array cannot be passed as a bare single-argument: it must be wrapped.
 	 * Strings that contain '#' naturally also cannot be passed as bare single-arguments, and
 	 * likewise must be wrapped. 
 	 */
@@ -151,10 +153,27 @@ else
 	$argc = 0;
 	$argv = array();
 }
+
+/* 50 parameters should be plenty for anybody. */
 if ($argc > 50)
 	execute_print_and_exit('Too many arguments for execute.php', 
 		"You specified too many arguments for execute.php.\n\nThe script only allows up to 50  arguments, as a cautionary measure."
 		);
+
+
+/* Convert string arguments matching symbolic constants to declared value of constant,
+   but ONLY if we ran with $_cqpweb_execute_cli_is_running */
+global $_cqpweb_execute_cli_is_running; 
+
+if ($_cqpweb_execute_cli_is_running ?? false) 
+{
+	$const_map = get_defined_constants(true)['user'];
+	for ($i = 2 ; $i < $argc ; $i++)
+		if (is_string[$argv[$i]])
+			if (isset($const_map[$argv[$i]]))
+				$argv[$i] = $const_map[$argv[$i]];
+	unset($const_map);
+}
 
 
 
@@ -185,10 +204,10 @@ cqpweb_shutdown_environment();
  */
 
 
-if ( isset($_GET['locationAfter']) && headers_sent() == false )
+if ( isset($_GET['locationAfter']) && !headers_sent() )
 	header('Location: ' . url_absolutify($_GET['locationAfter']));
-else if ( ! isset($_GET['locationAfter']) && headers_sent() == false )
-	execute_print_and_exit( 'CQPweb -- execute.php', 'Your function call has been finished executing!');
+else if ( ! isset($_GET['locationAfter']) && !headers_sent() )
+	execute_print_and_exit( 'CQPweb -- execute.php', 'Your function call has been executed.');
 
 
 /*
@@ -200,18 +219,22 @@ else if ( ! isset($_GET['locationAfter']) && headers_sent() == false )
 /** a special form of "exit" function just used by execute.php script */
 function execute_print_and_exit($title, $content)
 {
-	global $execute_cli_is_running;
-	if (isset($execute_cli_is_running) && $execute_cli_is_running)
+	global $_cqpweb_execute_cli_is_running;
+	if ($_cqpweb_execute_cli_is_running ?? false) 
 		exit("CQPweb has completed the requested action.\n");
 	else
 		exit(<<<HERE
-<html><head><title>$title</title></head><body><pre>
+<html lang="en">
+<head><title>$title</title></head>
+<body>
+<pre>
 $content
 
 CQPweb (c) 2008-today
-</pre></body></html>
+</pre>
+</body>
+</html>
+
 HERE
 		);
 }
-
-

@@ -58,7 +58,7 @@ require('../lib/exiterror-lib.php');
 require('../lib/xml-lib.php');
 require('../lib/scope-lib.php');
 require('../lib/freqtable-lib.php');
-require('../lib/cqp.inc.php');
+require('../lib/cqp.php');
 
 $Corpus = $User = NULL;
 
@@ -189,7 +189,11 @@ case 'create_from_metadata':
 	if ($_GET['action'] == 'Get list of texts') /* little trick with the button text! */
 	{
 		/* then we don't want to actually store it, just display a new form */
-		$string_of_texts_to_show_in_form = implode(' ', $restriction->get_item_list());
+// temp code ....
+if (false === ($lll = ($restriction->get_item_list())))
+	exiterror("Sorry, no text list can be dsplayed for the type of metadata restriction you have specified.");
+$string_of_texts_to_show_in_form = implode(' ', $lll);
+//		$string_of_texts_to_show_in_form = implode(' ', $restriction->get_item_list());
 		$header_cell_text = 'Viewing texts that match the following metadata restrictions: <br>' . $restriction->print_as_prose();
 		$field_to_show = $Corpus->primary_classification_field;
 
@@ -350,7 +354,7 @@ case 'create_from_query_regions':
 	$sc->populate_from_query_xml($qname, $_GET['xmlAtt']);
 	$sc->save();
 
-	set_next_absolute_location('index.php?ui=subcorpus');
+// 	set_next_absolute_location('index.php?ui=subcorpus');
 
 	break;
 
@@ -498,7 +502,7 @@ case 'add_texts':
 		{
 			$errstr = urlencode(implode(' ', $errors));
 			set_next_absolute_location("index.php?ui=subcorpus&subcorpusListOfIds=$string_of_ids"
-				. "&subcorpusFunction=add_texts_to_subcorpus&subcorpusToAddTo=$subcorpus_to"
+				. "&subcorpusFunction=add_texts_to_subcorpus&subcorpusToAddTo={$subcorpus_to->id}"
 				. "&subcorpusBadIds=$errstr");
 			break;
 		}

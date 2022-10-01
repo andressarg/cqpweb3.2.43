@@ -200,7 +200,9 @@ if (!empty($_GET['collocSolo']))
 	$solomode = true;
 }
 else
+{	$soloform = NULL;
 	$solomode = false;
+}
 
 
 /* and a purely display-related variable */
@@ -390,7 +392,7 @@ if (false == $intersect_result_scope)
 	/* if there is a subcorpus or restriction, then a table for that needs to be found or created */
 	if (QueryScope::TYPE_WHOLE_CORPUS != $query_record->qscope->type)
 	{
-		if ( false !== ($freqtable_record = $query_record->qscope->get_freqtable_record()) ) 
+		if (NULL !== ($freqtable_record = $query_record->qscope->get_freqtable_record()) ) 
 			;
 		else
 		{
@@ -409,7 +411,7 @@ if (false == $intersect_result_scope)
 // 		$sc = Subcorpus::new_from_id($query_record->subcorpus);
 // 		if (false == $sc)
 // 			exiterror("The subcorpus in which this query ran seems to have been deleted."); // necessary?
-// 		if ( false !== ($freqtable_record = $sc->get_freqtable_record()))
+// 		if (NULL !== ($freqtable_record = $sc->get_freqtable_record()))
 // 			;
 // 		else
 // 		{
@@ -443,8 +445,7 @@ else
 
 	/* same as above, but simplified because it CAN'T be a subcorpus; also note that we use the reduced token count
 	 * not the initial token count for checking for a freq-table-override.  */
-// 	if ( false !== ($freqtable_record = check_freqtable_restriction($reduced_restrictions)) )
-	if ( false !== ($freqtable_record = $intersect_result_scope->get_freqtable_record()) )
+	if ( NULL !== ($freqtable_record = $intersect_result_scope->get_freqtable_record()) )
 		;
 	else
 	{
@@ -898,6 +899,7 @@ function run_script_for_solo_collocation($query_record, $calc_options)
 	
 	foreach ($statistic as $s => $info)
 	{
+		$calc_options['calc_stat'] = $s;
 		$sql = create_statistic_sql_query($calc_options);
 		$counts = mysqli_fetch_assoc(do_sql_query($sql));
 		
@@ -925,7 +927,7 @@ function run_script_for_solo_collocation($query_record, $calc_options)
 	?>
 
 	<table class="concordtable fullwidth">
-		
+	
 	<?php
 	/* check that soloform actually occurs at all */
 	if (empty($basis_to_show))
@@ -949,8 +951,8 @@ function run_script_for_solo_collocation($query_record, $calc_options)
  		, <<<END_ROW_HTML
 
 		<tr>
-			<th class=\"concordtable\" width=\"50%\">Type of statistic</th>
-			<th class=\"concordtable\" width=\"50%\">
+			<th class="concordtable" width="50%\">Type of statistic</th>
+			<th class="concordtable" width="50%">
 				Value (for window span $calc_range_begin to $calc_range_end)
 			</th>
 		</tr>
@@ -967,8 +969,8 @@ END_ROW_HTML;
 		echo <<<END_ROW_HTML
 
 			<tr>
-				<td class=\"concordgrey\">{$info['desc']}</td>
-				<td class=\"concordgeneral\" align=\"center\">{$info['value']}</td>
+				<td class="concordgrey">{$info['desc']}</td>
+				<td class="concordgeneral" align="center">{$info['value']}</td>
 			</tr>
 
 END_ROW_HTML;
@@ -1052,4 +1054,5 @@ END_ROW_HTML;
 	
 	<?php
 }
+
 
