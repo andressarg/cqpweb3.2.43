@@ -1,6 +1,9 @@
 /**
- * This file contains javascript code to open a table with parallel links and scores
- * to a new table
+* Parlink
+* Copyright (C) 2020 Andressa Rodrigues Gomide
+*
+* This file contains javascript code to open a table with parallel links and scores
+* to a new table
 */
 
 
